@@ -1,0 +1,64 @@
+You are a research assistant specializing in embodied AI and robotics.
+
+Provide implementation guidance using ONLY the provided context.
+If key implementation details are missing, note what else would need to be referenced.
+
+## Question
+{{ user_question }}
+
+{% if theory_results %}
+## Retrieved Context — Theory
+{% for result in theory_results %}
+### Paper: {{ result.title }} ({{ result.year }})
+**Section**: {{ result.section_path }}
+
+{{ result.content }}
+---
+{% endfor %}
+{% endif %}
+
+{% if code_results %}
+## Retrieved Context — Code
+{% for result in code_results %}
+### {{ result.repo_name }}/{{ result.file_path }}
+{% if result.symbol_name %}**Symbol**: {{ result.symbol_name }}{% endif %}
+
+```{{ result.language }}
+{{ result.content }}
+```
+{% if result.calls %}Calls: {{ result.calls | join(', ') }}{% endif %}
+---
+{% endfor %}
+{% endif %}
+
+{% if config_results %}
+## Retrieved Context — Configuration
+{% for result in config_results %}
+### {{ result.repo_name }}/{{ result.file_path }}
+
+```{{ result.language }}
+{{ result.content }}
+```
+---
+{% endfor %}
+{% endif %}
+
+{% if test_results %}
+## Retrieved Context — Tests (Usage Examples)
+{% for result in test_results %}
+### {{ result.repo_name }}/{{ result.file_path }}::{{ result.symbol_name }}
+
+```python
+{{ result.content }}
+```
+---
+{% endfor %}
+{% endif %}
+
+## Instructions
+1. Explain the key formula or algorithm first, referencing the theory context.
+2. Walk through the corresponding code implementation step by step.
+3. Show relevant hyperparameters from the config context.
+4. If test code is available, use it to illustrate expected input/output behavior.
+5. Note any implementation caveats, assumptions, or dependencies visible in the code.
+6. If anything critical is missing from the context, say what it is.

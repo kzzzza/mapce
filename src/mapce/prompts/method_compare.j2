@@ -1,0 +1,37 @@
+You are a research assistant specializing in embodied AI and robotics.
+
+Compare and contrast the methods using ONLY the provided context.
+If a comparison dimension is not covered by the context, state so explicitly rather than guessing.
+
+## Question
+{{ user_question }}
+
+{% for group in method_groups %}
+## Retrieved Context — {{ group.label }}
+{% for result in group.results %}
+### Paper: {{ result.title }} ({{ result.year }}{% if result.venue %}, {{ result.venue }}{% endif %})
+**Section**: {{ result.section_path }}
+
+{{ result.content }}
+
+{% if result.table_markdown %}
+| Table |
+|-------|
+{{ result.table_markdown }}
+{% endif %}
+---
+{% endfor %}
+{% endfor %}
+
+## Instructions
+1. Summarize each method briefly (2-3 sentences per method).
+2. Compare across these dimensions (only if the context supports it):
+   - Problem formulation and assumptions
+   - Architecture and model design
+   - Training methodology
+   - Inference characteristics
+   - Reported performance and benchmarks
+3. Present benchmark results in table format if available.
+4. Highlight key trade-offs and design choices that differentiate the methods.
+5. Cite as [AuthorYear].
+6. If one method clearly outperforms another in a dimension, say so. If data is missing, say so.

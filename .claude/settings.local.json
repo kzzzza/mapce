@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "mapce": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/Users/kzzzza/workspace/rag/mapce",
+        "python",
+        "-m",
+        "mapce.mcp.server"
+      ]
+    }
+  },
+  "enabledMcpjsonServers": [
+    "mapce"
+  ]
+}
