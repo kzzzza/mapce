@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import lancedb
+import numpy as np
 
 from mapce.core.embedding import embed_single
 from mapce.db import get_connection, init_index_meta
@@ -87,12 +88,13 @@ def check_duplicate(
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
     """Compute cosine similarity between two vectors."""
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = sum(x * x for x in a) ** 0.5
-    norm_b = sum(x * x for x in b) ** 0.5
-    if norm_a == 0 or norm_b == 0:
+    va = np.asarray(a, dtype=np.float32)
+    vb = np.asarray(b, dtype=np.float32)
+    norm_a = float(np.linalg.norm(va))
+    norm_b = float(np.linalg.norm(vb))
+    if norm_a == 0.0 or norm_b == 0.0:
         return 0.0
-    return dot / (norm_a * norm_b)
+    return float(np.dot(va, vb) / (norm_a * norm_b))
 
 
 # ---------------------------------------------------------------------------
@@ -237,9 +239,10 @@ def delete_paper_safe(
     if db is None:
         db = get_connection()
 
+    from mapce.db import sql_str
     from mapce.db.operations import (
         delete_chunks_by_paper,
-        delete_chunks_by_repo,
+        delete_chunks_by_repo_name,
         delete_mappings_by_paper,
         get_meta,
     )
@@ -264,21 +267,26 @@ def delete_paper_safe(
     # Delete mappings
     summary["mappings_deleted"] = delete_mappings_by_paper(mapping_table, paper_id)
 
-    # Check if code chunks are shared — if not, delete them too
+    # Check if code chunks are shared — if not, delete them too.
+    # NOTE: code chunks are physically stored under whichever paper_id first
+    # indexed the repo, so deletion must key on repo_name alone (not this
+    # paper_id) to remove the single physical copy. Cross-paper *retrieval* of
+    # shared code is a separate, deeper limitation (code_search filters by
+    # paper_id) and is intentionally out of scope here.
     if repo_name:
-        # Count how many papers reference this repo
+        # Count how many *other* papers reference this repo
         try:
             remaining = (
                 mapping_table.search()
-                .where(f"repo_name = '{repo_name}' AND paper_id != '{paper_id}'")
+                .where(f"repo_name = {sql_str(repo_name)} AND paper_id != {sql_str(paper_id)}")
                 .to_list()
             )
         except Exception:
             remaining = []
 
         if not remaining:
-            # No other paper uses this repo — safe to delete code chunks
-            summary["code_chunks_deleted"] = delete_chunks_by_repo(chunks_table, paper_id, repo_name)
+            # No other paper uses this repo — safe to delete its code chunks
+            summary["code_chunks_deleted"] = delete_chunks_by_repo_name(chunks_table, repo_name)
 
     # Mark as deleted in metadata
     if meta:
@@ -319,6 +327,7 @@ def re_embed_all(
         Number of chunks re-embedded.
     """
     from mapce.core.embedding import embed
+    from mapce.db import sql_str
 
     if db is None:
         db = get_connection()
@@ -346,7 +355,7 @@ def re_embed_all(
 
     # Delete and re-add — LanceDB versioning keeps old data until compact
     for row in all_rows:
-        table.delete(f"chunk_id = '{row['chunk_id']}'")
+        table.delete(f"chunk_id = {sql_str(row['chunk_id'])}")
     table.add(updated)
 
     return len(updated)

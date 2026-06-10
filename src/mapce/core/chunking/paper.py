@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from mapce.core.chunking._util import slugify as _slugify
 from mapce.mineru.parser import MinerUOutput
 
 # Approximate token count (char-based heuristic: ~4 chars/token for English)
@@ -44,14 +45,6 @@ def _split_paragraphs(text: str) -> list[str]:
         else:
             result.append(para)
     return result
-
-
-def _slugify(text: str) -> str:
-    """Generate a URL-safe slug from text."""
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s-]", "", text)
-    text = re.sub(r"[\s_]+", "_", text)
-    return text[:80]
 
 
 def generate_paper_id(
@@ -161,7 +154,10 @@ def chunk_paper(
         heading = sec["heading"]
         level = sec.get("level", 2)
 
-        # Truncate L2 content to ~2000 tokens
+        # Truncate L2 content to ~2000 tokens. The embedding model only reads
+        # ~512 tokens anyway, so this is mostly cosmetic; tail paragraphs past
+        # the cut are still indexed as independent L3 chunks and are now
+        # directly searchable in the retrieval coarse stage.
         if len(sec_content) > L2_MAX_CHARS:
             sec_content = sec_content[:L2_MAX_CHARS] + "\n\n[... section truncated ...]"
 

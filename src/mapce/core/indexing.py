@@ -7,6 +7,7 @@ into a single end-to-end pipeline for indexing a paper.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -15,12 +16,13 @@ from pathlib import Path
 from typing import Any, Callable
 
 from mapce.core.chunking.paper import chunk_paper
-from mapce.core.embedding import embed
+from mapce.core.embedding import embed, embed_single
 from mapce.db import (
     get_connection,
     init_chunks,
     init_index_meta,
     insert_chunks,
+    sql_str,
     upsert_meta,
 )
 from mapce.mineru.api import batch_parse
@@ -111,10 +113,12 @@ def index_paper(
     Returns:
         The paper_id of the indexed paper.
     """
+    # Preliminary paper_id (from the pdf stem) used for the cache dir name and
+    # to detect whether the final paper_id changed. Defined on both branches so
+    # the comparison below never hits an unbound name.
+    prelim_id = pdf_path.stem
     if output_dir is None:
         # Use persistent cache so images/tables survive across sessions
-        # We need a preliminary paper_id for the directory name — use pdf stem
-        prelim_id = pdf_path.stem
         output_dir = _get_paper_cache_dir(prelim_id)
     else:
         output_dir = Path(output_dir)
@@ -192,12 +196,18 @@ def _index_from_mineru_dir(
 
     insert_chunks(chunks_table, chunks)
 
+    # Embed the title itself (not embeddings[0], which is the L1 content chunk).
+    # check_duplicate compares an incoming title's embedding against this, so it
+    # must be a title→title comparison to be meaningful.
+    title = metadata.get("title", "Untitled")
+    title_embedding = embed_single(title) if title else None
+
     upsert_meta(meta_table, {
         "paper_id": paper_id,
-        "title": metadata.get("title", "Untitled"),
+        "title": title,
         "arxiv_id": metadata.get("arxiv_id"),
         "doi": metadata.get("doi"),
-        "title_embedding": embeddings[0] if embeddings else None,
+        "title_embedding": title_embedding,
         "indexed_at": datetime.now(timezone.utc).isoformat(),
         "parser_version": "mineru_v4",
         "chunk_count": len(chunks),
@@ -232,7 +242,7 @@ def _update_paper_paths(paper_id: str, old_dir: Path, new_dir: Path) -> None:
     try:
         from mapce.db import get_connection, init_chunks
         table = init_chunks(get_connection())
-        rows = table.search().where(f"paper_id = '{paper_id}'").to_list()
+        rows = table.search().where(f"paper_id = {sql_str(paper_id)}").to_list()
         updated = []
         old_s = str(old_dir)
         new_s = str(new_dir)
@@ -248,7 +258,7 @@ def _update_paper_paths(paper_id: str, old_dir: Path, new_dir: Path) -> None:
         # LanceDB doesn't support in-place updates — delete and re-add
         if updated:
             for r in updated:
-                table.delete(f"chunk_id = '{r['chunk_id']}'")
+                table.delete(f"chunk_id = {sql_str(r['chunk_id'])}")
             table.add(updated)
     except Exception:
         pass  # best-effort; the data is still available at the new path
@@ -319,11 +329,14 @@ def index_paper_from_arxiv(
         cache_parent,
     )
 
-    # Extract metadata from arxiv (basic)
+    # Extract metadata from arxiv (basic). Only new-style ids (YYMM.NNNNN)
+    # encode the year; old-style ids (e.g. "hep-th/9901001") don't, so leave
+    # year=None there and let the MinerU-derived metadata fill it in later.
+    _ym = re.match(r"(\d{2})(\d{2})\.", arxiv_id)
     metadata = {
         "title": arxiv_id,  # will be updated from MinerU output
         "authors": [],
-        "year": int(f"20{arxiv_id[:2]}") if len(arxiv_id) >= 4 else None,
+        "year": int("20" + _ym.group(1)) if _ym else None,
         "venue": "arXiv",
         "arxiv_id": arxiv_id,
         "doi": None,

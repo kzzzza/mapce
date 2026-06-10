@@ -49,13 +49,6 @@ def _make_code_chunk_id(paper_id: str, repo_name: str, chunk_type: str, index: i
     return f"code:{paper_id}:{repo_name}:{chunk_type}:{index}"
 
 
-def _slugify(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s-]", "", text)
-    text = re.sub(r"[\s_]+", "_", text)
-    return text[:80]
-
-
 # ---------------------------------------------------------------------------
 # Utility
 # ---------------------------------------------------------------------------
@@ -392,6 +385,71 @@ _CPP_CLASS_RE = re.compile(
 )
 
 
+def _extract_braced_body(source: str, start: int) -> int | None:
+    """Return the offset just past the '}' that closes the first '{' at/after start.
+
+    Skips braces inside string literals, char literals, and // and /* */
+    comments, so a '}' in e.g. ``"}"``, ``'}'`` or ``// }`` does not
+    prematurely close the body. Returns None if no balanced closing brace
+    is found (e.g. a truncated or malformed function).
+    """
+    depth = 0
+    started = False
+    in_line_comment = in_block_comment = in_string = in_char = False
+    i, n = start, len(source)
+    while i < n:
+        ch = source[i]
+        nxt = source[i + 1] if i + 1 < n else ""
+        if in_line_comment:
+            if ch == "\n":
+                in_line_comment = False
+            i += 1
+        elif in_block_comment:
+            if ch == "*" and nxt == "/":
+                in_block_comment = False
+                i += 2
+            else:
+                i += 1
+        elif in_string:
+            if ch == "\\":
+                i += 2
+            else:
+                if ch == '"':
+                    in_string = False
+                i += 1
+        elif in_char:
+            if ch == "\\":
+                i += 2
+            else:
+                if ch == "'":
+                    in_char = False
+                i += 1
+        elif ch == "/" and nxt == "/":
+            in_line_comment = True
+            i += 2
+        elif ch == "/" and nxt == "*":
+            in_block_comment = True
+            i += 2
+        elif ch == '"':
+            in_string = True
+            i += 1
+        elif ch == "'":
+            in_char = True
+            i += 1
+        elif ch == "{":
+            depth += 1
+            started = True
+            i += 1
+        elif ch == "}":
+            depth -= 1
+            i += 1
+            if started and depth == 0:
+                return i
+        else:
+            i += 1
+    return None
+
+
 def _extract_cpp_symbols(source: str, file_path: str) -> dict[str, Any]:
     """Basic C++/CUDA symbol extraction using regex.
 
@@ -413,20 +471,16 @@ def _extract_cpp_symbols(source: str, file_path: str) -> dict[str, Any]:
         ret_type = match.group(1).strip()
         name = match.group(2)
         params = match.group(3)
-        # Approximate body extraction
+        # Approximate body extraction — brace matching that ignores braces
+        # inside string/char literals and comments.
         start = match.start()
-        # Count braces to find matching }
-        brace_count = 0
-        end = start
-        for i, ch in enumerate(source[start:]):
-            if ch == "{":
-                brace_count += 1
-            elif ch == "}":
-                brace_count -= 1
-                if brace_count == 0:
-                    end = start + i + 1
-                    break
-        body = source[start:end]
+        end = _extract_braced_body(source, start)
+        if end is None:
+            # Malformed/truncated body — fall back to the signature so we
+            # never emit an empty chunk.
+            body = f"{ret_type} {name}({params})"
+        else:
+            body = source[start:end]
         result["functions"].append({
             "name": name,
             "signature": f"{ret_type} {name}({params})",
@@ -459,48 +513,41 @@ def _chunk_file_l2(
     file_path: Path,
     root: Path,
     chunk_counter: int,
+    symbols: dict[str, Any],
+    language: str,
 ) -> dict[str, Any] | None:
-    """Generate L2 (file-level) chunk for a single source file."""
-    source = _read_file_safe(file_path)
-    if source is None:
-        return None
+    """Generate L2 (file-level) chunk for a single source file.
 
+    ``symbols``/``language`` are passed in by the caller (already parsed) so the
+    file is not read and parsed a second time.
+    """
     rel_path = str(file_path.relative_to(root))
-    ext = file_path.suffix
-
-    if ext == ".py":
-        symbols = _extract_python_symbols(source, rel_path)
-        language = "python"
-    elif ext in (".cpp", ".cu", ".cuh", ".h", ".hpp"):
-        symbols = _extract_cpp_symbols(source, rel_path)
-        language = "cpp" if ext != ".cu" else "cuda"
-    else:
-        return None
 
     # Build a file-level summary
     summary_parts = [f"# File: {rel_path}"]
     summary_parts.append(f"Language: {language}")
 
-    if symbols["imports"]:
+    # C++ symbol dicts lack some keys (decorators/main_block), so use .get().
+    if symbols.get("imports"):
         summary_parts.append("\n## Imports/Includes")
         summary_parts.extend(f"- {imp}" for imp in symbols["imports"][:30])
 
     # Function/class signatures
     all_sigs = []
-    for f in symbols["functions"]:
+    for f in symbols.get("functions", []):
         all_sigs.append(f"def {f['name']}(...)" if language == "python" else f"{f['name']}(...);")
-    for c in symbols["classes"]:
+    for c in symbols.get("classes", []):
         bases = f"({', '.join(c['bases'])})" if c.get("bases") else ""
         all_sigs.append(f"class {c['name']}{bases}")
     if all_sigs:
         summary_parts.append(f"\n## Symbols ({len(all_sigs)})")
         summary_parts.extend(f"- {s}" for s in all_sigs)
 
-    if symbols["globals"]:
+    if symbols.get("globals"):
         summary_parts.append("\n## Global Constants")
         summary_parts.extend(f"- {g['name']} = {g['value']}" for g in symbols["globals"])
 
-    if symbols["decorators"]:
+    if symbols.get("decorators"):
         summary_parts.append("\n## Module-Level Decorators (Registries)")
         summary_parts.extend(f"- @{d['call']}" for d in symbols["decorators"])
 
@@ -528,7 +575,7 @@ def _chunk_file_l2(
         "chunk_index": chunk_counter,
         "prev_chunk_id": None,
         "next_chunk_id": None,
-        "imports": symbols["imports"],
+        "imports": symbols.get("imports", []),
     }
     return chunk
 
@@ -561,7 +608,6 @@ def _chunk_symbols_l3(
     }
 
     for func in symbols.get("functions", []):
-        chunk_counter += 1
         chunks.append({
             "chunk_id": _make_code_chunk_id(paper_id, repo_name, "l3", chunk_counter),
             "chunk_type": "code_l3",
@@ -588,9 +634,9 @@ def _chunk_symbols_l3(
             "config_keys": None,
             **base,
         })
+        chunk_counter += 1
 
     for cls in symbols.get("classes", []):
-        chunk_counter += 1
         cls_content = f"class {cls['name']}"
         if cls.get("bases"):
             cls_content += f"({', '.join(cls['bases'])})"
@@ -628,11 +674,11 @@ def _chunk_symbols_l3(
             "config_keys": None,
             **base,
         })
+        chunk_counter += 1
 
         # Also chunk each method as L3
         for m in cls.get("methods", []):
             if m.get("body") and len(m["body"]) > 50:
-                chunk_counter += 1
                 chunks.append({
                     "chunk_id": _make_code_chunk_id(paper_id, repo_name, "l3", chunk_counter),
                     "chunk_type": "code_l3",
@@ -658,6 +704,7 @@ def _chunk_symbols_l3(
                     "config_keys": None,
                     **base,
                 })
+                chunk_counter += 1
 
     return chunks
 
@@ -692,7 +739,6 @@ def _chunk_module_l4(
 
     # Globals + decorators
     if symbols.get("globals") or symbols.get("decorators"):
-        chunk_counter += 1
         content_parts = [f"# Module-level definitions in {rel_path}"]
         for g in symbols.get("globals", []):
             content_parts.append(f"{g['name']} = {g['value']}")
@@ -723,10 +769,10 @@ def _chunk_module_l4(
             "config_keys": None,
             **base,
         })
+        chunk_counter += 1
 
     # __main__ block
     if symbols.get("main_block"):
-        chunk_counter += 1
         mb = symbols["main_block"]
         chunks.append({
             "chunk_id": _make_code_chunk_id(paper_id, repo_name, "l4", chunk_counter),
@@ -752,6 +798,7 @@ def _chunk_module_l4(
             "config_keys": None,
             **base,
         })
+        chunk_counter += 1
 
     return chunks
 
@@ -795,7 +842,6 @@ def _chunk_tests(
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if not node.name.startswith("test"):
                 continue
-            chunk_counter += 1
             body = ast.unparse(node)
             # Guess the tested symbol from the function name
             tested_symbol = node.name.replace("test_", "").replace("test", "")
@@ -830,6 +876,7 @@ def _chunk_tests(
                 "config_keys": None,
                 **base,
             })
+            chunk_counter += 1
 
     return chunks
 
@@ -983,7 +1030,10 @@ def chunk_repo(
                     all_chunks.extend(test_chunks)
                     chunk_counter += len(test_chunks)
                 else:
-                    l2 = _chunk_file_l2(paper_id, repo_name, file_path, root, chunk_counter)
+                    l2 = _chunk_file_l2(
+                        paper_id, repo_name, file_path, root, chunk_counter,
+                        symbols, language,
+                    )
                     if l2:
                         all_chunks.append(l2)
                         chunk_counter += 1

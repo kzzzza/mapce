@@ -15,7 +15,7 @@ from typing import Any
 import lancedb
 
 from mapce.core.embedding import embed_single
-from mapce.db import get_connection, init_chunks, init_index_meta
+from mapce.db import get_connection, init_chunks, init_index_meta, sql_in_list, sql_str
 
 
 # ---------------------------------------------------------------------------
@@ -170,18 +170,18 @@ def _build_where_clause(filters: dict[str, Any], paper_ids: list[str] | None = N
     parts = []
 
     if paper_ids:
-        ids_quoted = ", ".join(f"'{pid}'" for pid in paper_ids)
-        parts.append(f"paper_id IN ({ids_quoted})")
+        parts.append(f"paper_id IN ({sql_in_list(paper_ids)})")
 
     if "year_min" in filters:
         parts.append(f"year >= {filters['year_min']}")
     if "year_max" in filters:
         parts.append(f"year <= {filters['year_max']}")
     if "venue" in filters:
-        parts.append(f"venue = '{filters['venue']}'")
+        parts.append(f"venue = {sql_str(filters['venue'])}")
 
-    # Only return non-deleted paper chunks
-    parts.append("chunk_type LIKE 'paper_%' OR chunk_type IN ('figure', 'table')")
+    # Only return non-deleted paper chunks. Parenthesize the OR so it isn't
+    # swallowed by the AND join (otherwise figures/tables from any paper leak).
+    parts.append("(chunk_type LIKE 'paper_%' OR chunk_type IN ('figure', 'table'))")
 
     return " AND ".join(parts) if parts else None
 
@@ -266,7 +266,7 @@ def search(
     if intent.filters.get("year_max"):
         l1_where += f" AND year <= {intent.filters['year_max']}"
     if intent.filters.get("venue"):
-        l1_where += f" AND venue = '{intent.filters['venue']}'"
+        l1_where += f" AND venue = {sql_str(intent.filters['venue'])}"
 
     try:
         l1_results = (
@@ -290,25 +290,29 @@ def search(
     # ---- Stage 2: Fine ranking ----
 
     if intent.intent == "paper_search":
-        # Search L2 chunks within the paper candidate set
-        l2_where_parts = [f"chunk_type = 'paper_l2'"]
+        # Search L2 *and* L3 chunks within the paper candidate set. L3 paragraphs
+        # past the L2 truncation point only exist at L3, so coarse screening must
+        # cover them directly; Stage-3 dedup drops anything re-expanded.
+        l2_where_parts = ["chunk_type IN ('paper_l2', 'paper_l3')"]
         if paper_ids:
-            id_str = ", ".join(f"'{pid}'" for pid in paper_ids)
-            l2_where_parts.append(f"paper_id IN ({id_str})")
+            l2_where_parts.append(f"paper_id IN ({sql_in_list(paper_ids)})")
         l2_where = " AND ".join(l2_where_parts)
+
+        # Pull a wider candidate pool since it now spans two granularities.
+        paper_limit = top_k_chunks * 3
 
         try:
             l2_results = (
                 table.search(query_emb)
                 .where(l2_where)
-                .limit(top_k_chunks)
+                .limit(paper_limit)
                 .to_list()
             )
         except Exception:
             l2_results = (
                 table.search()
                 .where(l2_where)
-                .limit(top_k_chunks)
+                .limit(paper_limit)
                 .to_list()
             )
 
@@ -316,8 +320,7 @@ def search(
         # Search code L2 chunks within papers that have code
         code_where_parts = ["chunk_type IN ('code_l2', 'code_l3')"]
         if paper_ids:
-            id_str = ", ".join(f"'{pid}'" for pid in paper_ids)
-            code_where_parts.append(f"paper_id IN ({id_str})")
+            code_where_parts.append(f"paper_id IN ({sql_in_list(paper_ids)})")
         code_where = " AND ".join(code_where_parts)
 
         try:
@@ -337,12 +340,12 @@ def search(
     else:
         # hybrid: search both
         paper_where = " AND ".join([
-            "chunk_type = 'paper_l2'",
-            f"paper_id IN ({', '.join(f'{pid}' for pid in paper_ids)})" if paper_ids else "1=1",
+            "chunk_type IN ('paper_l2', 'paper_l3')",
+            f"paper_id IN ({sql_in_list(paper_ids)})" if paper_ids else "1=1",
         ])
         code_where = " AND ".join([
             "chunk_type IN ('code_l2', 'code_l3')",
-            f"paper_id IN ({', '.join(f'{pid}' for pid in paper_ids)})" if paper_ids else "1=1",
+            f"paper_id IN ({sql_in_list(paper_ids)})" if paper_ids else "1=1",
         ])
 
         try:
@@ -408,7 +411,7 @@ def _expand_context(
             try:
                 l3_rows = (
                     table.search()
-                    .where(f"paper_id = '{paper_id}' AND chunk_type = 'paper_l3'")
+                    .where(f"paper_id = {sql_str(paper_id)} AND chunk_type = 'paper_l3'")
                     .limit(20)
                     .to_list()
                 )
@@ -416,7 +419,7 @@ def _expand_context(
                 l2_heading = section_path.split(" > ")[0] if section_path else ""
                 for l3_row in l3_rows:
                     l3_path = l3_row.get("section_path", "")
-                    if l3_id := l3_row["chunk_id"] not in seen_ids:
+                    if (l3_id := l3_row["chunk_id"]) not in seen_ids:
                         expanded.append(_row_to_result(l3_row, score * 0.9))
                         seen_ids.add(l3_id)
                         if len([r for r in expanded if r.chunk_type == "paper_l3" and r.paper_id == paper_id]) >= 5:
@@ -429,7 +432,7 @@ def _expand_context(
                 try:
                     fig_rows = (
                         table.search()
-                        .where(f"paper_id = '{paper_id}' AND chunk_type = 'figure'")
+                        .where(f"paper_id = {sql_str(paper_id)} AND chunk_type = 'figure'")
                         .limit(3)
                         .to_list()
                     )
@@ -444,7 +447,7 @@ def _expand_context(
                 try:
                     tbl_rows = (
                         table.search()
-                        .where(f"paper_id = '{paper_id}' AND chunk_type = 'table'")
+                        .where(f"paper_id = {sql_str(paper_id)} AND chunk_type = 'table'")
                         .limit(3)
                         .to_list()
                     )
@@ -466,8 +469,8 @@ def _expand_context(
                     siblings = (
                         table.search()
                         .where(
-                            f"paper_id = '{paper_id}' AND repo_name = '{repo}' "
-                            f"AND file_path = '{file_path}' AND chunk_type IN ('code_l3', 'code_l4')"
+                            f"paper_id = {sql_str(paper_id)} AND repo_name = {sql_str(repo)} "
+                            f"AND file_path = {sql_str(file_path)} AND chunk_type IN ('code_l3', 'code_l4')"
                         )
                         .limit(15)
                         .to_list()
@@ -487,7 +490,7 @@ def _expand_context(
                 try:
                     call_rows = (
                         table.search()
-                        .where(f"chunk_id = '{call_id}'")
+                        .where(f"chunk_id = {sql_str(call_id)}")
                         .limit(1)
                         .to_list()
                     )
@@ -503,7 +506,7 @@ def _expand_context(
                 try:
                     test_rows = (
                         table.search()
-                        .where(f"chunk_id = '{test_id}'")
+                        .where(f"chunk_id = {sql_str(test_id)}")
                         .limit(1)
                         .to_list()
                     )
@@ -558,14 +561,12 @@ def search_code(
 
 def get_chunk_by_id(
     chunk_id: str,
-    expand: bool = True,
     db: lancedb.DBConnection | None = None,
 ) -> RetrievalResult | None:
-    """Look up a single chunk by ID, optionally with context expansion.
+    """Look up a single chunk by ID.
 
     Args:
         chunk_id: The chunk ID to look up.
-        expand: If True, also fetch adjacent chunks (prev/next).
         db: Optional LanceDB connection.
 
     Returns:
@@ -576,31 +577,14 @@ def get_chunk_by_id(
     table = init_chunks(db)
 
     try:
-        rows = table.search().where(f"chunk_id = '{chunk_id}'").limit(1).to_list()
+        rows = table.search().where(f"chunk_id = {sql_str(chunk_id)}").limit(1).to_list()
     except Exception:
         return None
 
     if not rows:
         return None
 
-    result = _row_to_result(rows[0], 1.0)
-
-    if expand:
-        # Fetch adjacent chunks
-        for neighbor_id in (rows[0].get("prev_chunk_id"), rows[0].get("next_chunk_id")):
-            if not neighbor_id:
-                continue
-            try:
-                neighbor_rows = (
-                    table.search()
-                    .where(f"chunk_id = '{neighbor_id}'")
-                    .limit(1)
-                    .to_list()
-                )
-            except Exception:
-                continue
-
-    return result
+    return _row_to_result(rows[0], 1.0)
 
 
 def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) -> dict[str, Any] | None:
@@ -618,14 +602,15 @@ def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) ->
     table = init_chunks(db)
 
     try:
+        pid = sql_str(paper_id)
         # L1
-        l1_rows = table.search().where(f"paper_id = '{paper_id}' AND chunk_type = 'paper_l1'").limit(1).to_list()
+        l1_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'paper_l1'").limit(1).to_list()
         # L2 sections
-        l2_rows = table.search().where(f"paper_id = '{paper_id}' AND chunk_type = 'paper_l2'").to_list()
+        l2_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'paper_l2'").to_list()
         # Figures
-        fig_rows = table.search().where(f"paper_id = '{paper_id}' AND chunk_type = 'figure'").to_list()
+        fig_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'figure'").to_list()
         # Tables
-        tbl_rows = table.search().where(f"paper_id = '{paper_id}' AND chunk_type = 'table'").to_list()
+        tbl_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'table'").to_list()
     except Exception:
         return None
 

@@ -12,6 +12,7 @@ from typing import Any
 import lancedb
 import pyarrow as pa
 
+from ._sql import sql_str
 from .schema import TABLE_CHUNKS, TABLE_MAPPING, TABLE_INDEX_META
 
 
@@ -43,22 +44,36 @@ def insert_chunks(table: Any, rows: list[dict[str, Any]]) -> int:
 def delete_chunks_by_paper(table: Any, paper_id: str) -> int:
     """Delete all chunks for a paper. Returns count deleted (approx)."""
     before = table.count_rows()
-    table.delete(f"paper_id = '{paper_id}'")
+    table.delete(f"paper_id = {sql_str(paper_id)}")
     after = table.count_rows()
     return before - after
 
 
 def delete_chunks_by_repo(table: Any, paper_id: str, repo_name: str) -> int:
-    """Delete code chunks for a specific repo under a paper."""
+    """Delete code chunks for a specific repo under a single owning paper."""
     before = table.count_rows()
-    table.delete(f"paper_id = '{paper_id}' AND repo_name = '{repo_name}'")
+    table.delete(f"paper_id = {sql_str(paper_id)} AND repo_name = {sql_str(repo_name)}")
+    after = table.count_rows()
+    return before - after
+
+
+def delete_chunks_by_repo_name(table: Any, repo_name: str) -> int:
+    """Delete all code chunks for a repo regardless of owning paper_id.
+
+    Code chunks are physically stored under whichever paper_id first indexed
+    the repo, so deleting "this paper's copy" can miss the real chunks. When a
+    repo is no longer referenced by any paper, this removes the single physical
+    copy by repo_name alone.
+    """
+    before = table.count_rows()
+    table.delete(f"repo_name = {sql_str(repo_name)}")
     after = table.count_rows()
     return before - after
 
 
 def count_chunks_for_paper(table: Any, paper_id: str) -> int:
     """Count chunks belonging to a paper."""
-    return table.count_rows(f"paper_id = '{paper_id}'")
+    return table.count_rows(f"paper_id = {sql_str(paper_id)}")
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +94,7 @@ def insert_mappings(table: Any, rows: list[dict[str, Any]]) -> int:
 
 def delete_mappings_by_paper(table: Any, paper_id: str) -> int:
     before = table.count_rows()
-    table.delete(f"paper_id = '{paper_id}'")
+    table.delete(f"paper_id = {sql_str(paper_id)}")
     after = table.count_rows()
     return before - after
 
@@ -96,14 +111,14 @@ def init_index_meta(db: lancedb.DBConnection) -> Any:
 def upsert_meta(table: Any, row: dict[str, Any]) -> None:
     """Insert or update index metadata for a paper."""
     # LanceDB doesn't have native upsert; delete-then-insert
-    table.delete(f"paper_id = '{row['paper_id']}'")
+    table.delete(f"paper_id = {sql_str(row['paper_id'])}")
     table.add([row])
 
 
 def get_meta(table: Any, paper_id: str) -> dict | None:
     """Get index metadata for a paper."""
     try:
-        result = table.search().where(f"paper_id = '{paper_id}'").limit(1).to_list()
+        result = table.search().where(f"paper_id = {sql_str(paper_id)}").limit(1).to_list()
         return result[0] if result else None
     except Exception:
         return None
