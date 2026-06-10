@@ -1,3 +1,5 @@
+[English](storage_EN.md)<br>[← Back](../README.md)
+
 # 存储说明
 
 ## 总览

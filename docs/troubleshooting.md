@@ -1,3 +1,5 @@
+[English](troubleshooting_EN.md)<br>[← Back](../README.md)
+
 # 常见问题
 
 ## `MINERU_API_TOKEN is not set`
