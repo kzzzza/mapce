@@ -4,7 +4,9 @@
 
 [English](README_EN.md)
 
-MAPCE是一个面向泛 CS 学术研究的个人 RAG 知识库。支持论文 PDF 解析、代码仓库结构化分块，通过向量+全文混合检索，以 MCP Server 形式为 AI Agent 提供可复用的学术知识检索能力。
+**MAPCE** 是一个面向泛 CS 学术研究的个人 RAG 知识库。支持论文 PDF 解析、代码仓库结构化分块，通过向量+全文混合检索，以 MCP Server 形式为 AI Agent 提供可复用的学术知识检索能力。
+
+> [关于这个项目的bolg](https://kzzzza.github.io/2026/06/09/Tool_agent_paper_research/)
 
 ### 适用场景
 
@@ -100,3 +102,13 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 | [docs/storage.md](docs/storage.md) | 存储形式：LanceDB、模型缓存、临时文件、清理 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题与解决方案 |
 | [docs/development.md](docs/development.md) | 开发指南（架构、分块策略、项目结构、添加数据源） |
+
+## MAPCE TODO
+
+- [ ] **代码分析增强**：Python AST 解析还行，C++/CUDA 只能用正则硬上，模板元编程和复杂宏展开处理不了。需要支持更多语言（Makefile、Dockerfile、shell 脚本等）
+- [ ] **检索质量优化**：分块策略影响检索效果，分太粗不准、分太细上下文不够，需要进一步迭代和测试
+- [ ] **自动更新机制**：arXiv 新版本、代码仓库新 commit 自动检测。理想状态：跑在个人服务器上挂 loop，检测到更新后通过微信/飞书询问用户是否需要同步
+- [ ] **前端界面**：目前纯 MCP + 命令行，Agent 用着方便但人不方便直接浏览，需要加一个简单前端
+- [ ] **检索效果测试**：目前只是"能用"，需要系统性测试——agent 检索质量、token 节约效果、召回率等指标
+- [ ] **Zotero 深度集成**：不只是提取 PDF，同步 Zotero 用户笔记到数据库，或者做一个 Zotero 集成的 agent 插件
+

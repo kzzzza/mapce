@@ -6,6 +6,8 @@
 
 MAPCE is a personal RAG knowledge base for general CS academic research. It supports PDF parsing, structured code repository chunking, and vector + full-text hybrid retrieval, served as an MCP Server to provide reusable academic knowledge retrieval for AI agents.
 
+> [bolg about this project](https://kzzzza.github.io/2026/06/09/Tool_agent_paper_research/)
+
 ### Use Cases
 
 - Literature survey & systematic review — cross-paper semantic search with year/venue filtering
@@ -119,7 +121,12 @@ results, _ = search_code('self-attention transformer implementation')
 | [docs/troubleshooting.md](docs/troubleshooting.md) | FAQ and solutions |
 | [docs/development.md](docs/development.md) | Development guide (architecture, chunking strategy, project structure) |
 
-## Requirements
+## MAPCE TODO
 
-- Python ≥ 3.11 · [uv](https://astral.sh/uv) package manager · [MinerU API Token](https://mineru.net/apiManage/token)
-- macOS / Linux · 16 GB RAM · ~5 GB disk
+- [ ] **Code Analysis Enhancement**: Python AST parsing works decently, but C++/CUDA relies on regex hacks — template metaprogramming and complex macro expansion are basically unhandled. Need to support more languages (Makefile, Dockerfile, shell scripts, etc.)
+- [ ] **Retrieval Quality Optimization**: Chunking strategy heavily impacts retrieval — too coarse and results are imprecise, too fine and context is insufficient. Needs further iteration and testing.
+- [ ] **Auto-Update Mechanism**: Automatically detect new arXiv versions and new commits in code repos. Ideal setup: run on a personal server with a loop, detect changes, and notify the user via WeChat / Feishu to confirm syncing.
+- [ ] **Frontend UI**: Currently CLI + MCP only — convenient for agents but unfriendly for humans. Need a simple frontend for browsing indexed content.
+- [ ] **Retrieval Benchmarking**: Right now it just "works." Needs systematic evaluation — agent retrieval quality, token savings, recall rate, and other metrics.
+- [ ] **Deep Zotero Integration**: Go beyond just extracting PDFs — sync Zotero user notes into the database, or build a Zotero-integrated agent plugin.
+
