@@ -18,13 +18,14 @@ MAPCE is a personal RAG knowledge base for general CS academic research. It supp
 ## Installation
 
 - Python ≥ 3.11 · [uv](https://astral.sh/uv) package manager · [MinerU API Token](https://mineru.net/apiManage/token) (free registration)
-- macOS / Linux (Apple Silicon recommended) · 16 GB RAM · ~5 GB disk
+- macOS / Linux (Apple Silicon recommended) · 16 GB RAM · ~3 GB disk
 
 ```bash
 # 1. Install uv (if not installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. Enter project and sync dependencies
+git clone https://github.com/kzzzza/mapce.git
 cd mapce
 uv sync
 
@@ -33,7 +34,7 @@ cp .env.example .env
 # Edit .env — at minimum, fill in MINERU_API_TOKEN
 # Users in mainland China: uncomment proxy lines and fill in your proxy address
 
-# 4. Initialize database and download embedding model (first run only, ~2 GB)
+# 4. Initialize database and download embedding model (first run only, ~2.1 GB)
 uv run --env-file .env python scripts/init_db.py
 ```
 
@@ -127,6 +128,5 @@ results, _ = search_code('self-attention transformer implementation')
 - [ ] **Retrieval Quality Optimization**: Chunking strategy heavily impacts retrieval — too coarse and results are imprecise, too fine and context is insufficient. Needs further iteration and testing.
 - [ ] **Auto-Update Mechanism**: Automatically detect new arXiv versions and new commits in code repos. Ideal setup: run on a personal server with a loop, detect changes, and notify the user via WeChat / Feishu to confirm syncing.
 - [ ] **Frontend UI**: Currently CLI + MCP only — convenient for agents but unfriendly for humans. Need a simple frontend for browsing indexed content.
-- [ ] **Retrieval Benchmarking**: Right now it just "works." Needs systematic evaluation — agent retrieval quality, token savings, recall rate, and other metrics.
 - [ ] **Deep Zotero Integration**: Go beyond just extracting PDFs — sync Zotero user notes into the database, or build a Zotero-integrated agent plugin.
 

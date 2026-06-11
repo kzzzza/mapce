@@ -18,13 +18,14 @@
 ## 安装
 
 - Python ≥ 3.11 · [uv](https://astral.sh/uv) 包管理器 · [MinerU API Token](https://mineru.net/apiManage/token)（免费注册）
-- macOS / Linux（推荐 Apple Silicon）· 16 GB 内存 · ~5 GB 磁盘
+- macOS / Linux（推荐 Apple Silicon）· 16 GB 内存 · ~3 GB 磁盘
 
 ```bash
 # 1. 安装 uv（如未安装）
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. 进入项目，同步依赖
+git clone https://github.com/kzzzza/mapce.git
 cd mapce
 uv sync
 
@@ -33,7 +34,7 @@ cp .env.example .env
 # 编辑 .env，至少填入 MINERU_API_TOKEN
 # 中国大陆用户取消代理变量的注释并填入代理地址
 
-# 4. 初始化数据库并下载嵌入模型（仅首次，约 2 GB）
+# 4. 初始化数据库并下载嵌入模型（仅首次，约 2.1 GB）
 uv run --env-file .env python scripts/init_db.py
 ```
 
@@ -108,7 +109,6 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 - [ ] **代码分析增强**：Python AST 解析还行，C++/CUDA 只能用正则硬上，模板元编程和复杂宏展开处理不了。需要支持更多语言（Makefile、Dockerfile、shell 脚本等）
 - [ ] **检索质量优化**：分块策略影响检索效果，分太粗不准、分太细上下文不够，需要进一步迭代和测试
 - [ ] **自动更新机制**：arXiv 新版本、代码仓库新 commit 自动检测。理想状态：跑在个人服务器上挂 loop，检测到更新后通过微信/飞书询问用户是否需要同步
-- [ ] **前端界面**：目前纯 MCP + 命令行，Agent 用着方便但人不方便直接浏览，需要加一个简单前端
-- [ ] **检索效果测试**：目前只是"能用"，需要系统性测试——agent 检索质量、token 节约效果、召回率等指标
+- [ ] **前端界面**：目前纯 MCP + 命令行，Agent 用着方便但用户不方便直接浏览，需要加一个简单前端
 - [ ] **Zotero 深度集成**：不只是提取 PDF，同步 Zotero 用户笔记到数据库，或者做一个 Zotero 集成的 agent 插件
 
