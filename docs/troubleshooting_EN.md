@@ -24,7 +24,7 @@ Verify proxy settings in `.env` (`http_proxy`, `https_proxy`). `git clone` inher
 
 ## Embedding Model Download Stuck or Slow
 
-First run downloads ~2 GB from HuggingFace. Users in mainland China must configure a proxy. Subsequent runs load from local cache in seconds.
+First run downloads ~2.1 GB from HuggingFace. Users in mainland China must configure a proxy. Subsequent runs load from local cache in seconds.
 
 ## High Memory Usage During Batch Embedding
 

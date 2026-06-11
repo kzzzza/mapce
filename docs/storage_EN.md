@@ -38,14 +38,18 @@ All indexed data resides here after indexing. This is MAPCE's core storage.
 └── _metadata.db                   # LanceDB internal metadata (SQLite)
 ```
 
-### Disk Usage Estimate
+### Disk Usage
+
+LanceDB uses columnar compression, so actual disk usage is much smaller than raw vector size. Based on measured data from 28 papers, 18 code repos, and 48,450 chunks:
 
 | Data | Per Paper |
 |------|-----------|
-| Paper chunks (~220 rows × 1024-d) | ~5–10 MB |
-| Code chunks (~1300 rows × 1024-d) | ~30–50 MB |
+| Paper chunks (~150–500 rows × 1024-d) | ~1–3 MB |
+| Code chunks (~500–1500 rows × 1024-d) | ~3–10 MB |
 | Metadata + mappings | < 1 MB |
-| **Per paper + code total** | **~40–60 MB** |
+| **Per paper + code total** | **~8–20 MB** |
+
+> **Real-world reference**: current index of 28 papers (18 with code), `chunks.lance/` ≈ 239 MB, averaging ~8.5 MB per paper.
 
 ### Lifecycle
 
@@ -127,7 +131,7 @@ MinerU output is the sole source of figure and table data. It is **never deleted
 |-------|-----------|---------------------------------|
 | Text-heavy (few figures) | 3–8 MB | ~0.5–1.5 MB |
 | Figure-rich | 15–25 MB | ~1–2 MB |
-| **Average per paper** | **~13 MB** | **~1.3 MB** |
+| **Average per paper** | **~13 MB** | **~2 MB** |
 
 **Lifecycle**: same as the LanceDB index — persists with the paper. Delete a paper's cache via `shutil.rmtree(~/.mapce/data/papers/<paper_id>/)`.
 
