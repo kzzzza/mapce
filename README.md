@@ -112,3 +112,7 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 - [ ] **前端界面**：目前纯 MCP + 命令行，Agent 用着方便但用户不方便直接浏览，需要加一个简单前端
 - [ ] **Zotero 深度集成**：不只是提取 PDF，同步 Zotero 用户笔记到数据库，或者做一个 Zotero 集成的 agent 插件
 
+## 许可
+
+[MIT](LICENSE)
+

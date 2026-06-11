@@ -130,3 +130,7 @@ results, _ = search_code('self-attention transformer implementation')
 - [ ] **Frontend UI**: Currently CLI + MCP only — convenient for agents but unfriendly for humans. Need a simple frontend for browsing indexed content.
 - [ ] **Deep Zotero Integration**: Go beyond just extracting PDFs — sync Zotero user notes into the database, or build a Zotero-integrated agent plugin.
 
+## License
+
+[MIT](LICENSE)
+
