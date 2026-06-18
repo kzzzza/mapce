@@ -1,0 +1,131 @@
+{
+  "section": "data_quality",
+  "overall": "FAIL",
+  "index_overview": {
+    "total_papers": 110,
+    "total_chunks": 68491,
+    "chunk_type_distribution": {
+      "paper_l1": 110,
+      "paper_l2": 3088,
+      "paper_l3": 22291,
+      "code_l1": 24,
+      "code_l2": 3724,
+      "code_l3": 36375,
+      "code_l4": 848,
+      "code_config": 372,
+      "code_l5": 134,
+      "figure": 1048,
+      "table": 477
+    },
+    "source_type_distribution": {
+      "paper": 27014,
+      "code": 41477
+    },
+    "papers_with_code_indexed": 20
+  },
+  "checks": [
+    {
+      "name": "D1 元数据完整性",
+      "status": "WARN",
+      "metrics": {
+        "title_valid_rate": 0.9455,
+        "bad_title_count": 6,
+        "year_coverage": 0.9636,
+        "venue_coverage": 0.9636,
+        "author_coverage": 0.0,
+        "venue_distribution": {
+          "arXiv": 106,
+          "": 4
+        }
+      },
+      "note": "6 篇标题=arxivID; authors 覆盖率 0%"
+    },
+    {
+      "name": "D2 状态一致性",
+      "status": "WARN",
+      "metrics": {
+        "status_distribution": {
+          "complete": 91,
+          "code_pending": 19
+        },
+        "code_pending_count": 19,
+        "code_pending_rate": 0.1727,
+        "has_code_indexed_inconsistent": 0
+      },
+      "note": "19 篇 code_pending (17%)"
+    },
+    {
+      "name": "D3 chunk 完整性",
+      "status": "WARN",
+      "metrics": {
+        "papers_missing_l1": 0,
+        "missing_l1_ids": [],
+        "chunk_count_mismatch": 20,
+        "l1": 110,
+        "l2": 3088,
+        "l3": 22291
+      },
+      "note": "缺 L1: 0; chunk_count 不一致: 20"
+    },
+    {
+      "name": "D4 内容健康",
+      "status": "FAIL",
+      "metrics": {
+        "empty_or_short_chunks": 117,
+        "empty_rate": 0.00171,
+        "duplicate_chunk_ids": 1067,
+        "exact_dup_content": 11141,
+        "exact_dup_content_rate": 0.16266
+      },
+      "note": "重复 chunk_id 1067(硬缺陷); 空/超短 117 (0.17%); 完全重复内容 11141"
+    },
+    {
+      "name": "D5 嵌入健康",
+      "status": "PASS",
+      "metrics": {
+        "embedding_coverage": 1.0,
+        "null_embeddings": 0,
+        "wrong_dim": 0,
+        "zero_vectors": 0,
+        "nan_inf_vectors": 0
+      },
+      "note": "覆盖 100.00%; 坏向量 0"
+    },
+    {
+      "name": "D6 特殊块(图/表)",
+      "status": "WARN",
+      "metrics": {
+        "figure_chunks": 1048,
+        "table_chunks": 477,
+        "figures_missing_path": 1006,
+        "papers_with_figures": 107,
+        "papers_total": 110
+      },
+      "note": "figure 1048 / table 477; 107/110 篇有图"
+    },
+    {
+      "name": "D7 代码图谱",
+      "status": "WARN",
+      "metrics": {
+        "code_chunks": 41477,
+        "symbol_missing_rate(l2-l5)": 0.0907,
+        "chunks_with_calls": 0,
+        "chunks_with_called_by": 0,
+        "total_graph_edges": 0,
+        "orphan_reference_rate": 0.0,
+        "chunks_with_associated_test": 0,
+        "callgraph_populated": false
+      },
+      "note": "call-graph 边数 0; symbol 缺失率 9%"
+    },
+    {
+      "name": "D8 Paper↔Code 映射表",
+      "status": "FAIL",
+      "metrics": {
+        "mapping_rows": 0,
+        "papers_with_code_indexed": 20
+      },
+      "note": "paper_code_mapping 行数 = 0 (期望随 20 篇带代码论文填充)"
+    }
+  ]
+}

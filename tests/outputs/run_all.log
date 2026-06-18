@@ -1,0 +1,45 @@
+/Users/kzzzza/workspace/rag/mapce/src/mapce/core/embedding.py:28: UserWarning: The model intfloat/multilingual-e5-large now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.
+  _model = TextEmbedding(model_name=name)
+######## MAPCE 索引质量测试 ########
+
+=== check_01 数据质量 (D1–D8) ===
+  ⚠️  [WARN] D1 元数据完整性 — 6 篇标题=arxivID; authors 覆盖率 0%
+  ⚠️  [WARN] D2 状态一致性 — 19 篇 code_pending (17%)
+  ⚠️  [WARN] D3 chunk 完整性 — 缺 L1: 0; chunk_count 不一致: 20
+  ❌ [FAIL] D4 内容健康 — 重复 chunk_id 1067(硬缺陷); 空/超短 117 (0.17%); 完全重复内容 11141
+  ✅ [PASS] D5 嵌入健康 — 覆盖 100.00%; 坏向量 0
+  ⚠️  [WARN] D6 特殊块(图/表) — figure 1048 / table 477; 107/110 篇有图
+  ⚠️  [WARN] D7 代码图谱 — call-graph 边数 0; symbol 缺失率 9%
+  ❌ [FAIL] D8 Paper↔Code 映射表 — paper_code_mapping 行数 = 0 (期望随 20 篇带代码论文填充)
+  → 总体: FAIL  (outputs/data_quality.json)
+
+=== check_02 检索质量 (R1–R8) ===
+  [R1] 标题→论文 known-item …
+  ✅ [PASS] R1 标题→论文 — R@1=91% R@5=99% MRR=0.94
+  [R2] 摘要首句→论文 semantic …
+  ✅ [PASS] R2 摘要首句→论文 — R@5=93% MRR=0.91
+  [R3] chunk 自检索 (sample 150) …
+  ❌ [FAIL] R3 chunk 自检索 — top1 论文命中=29% MRR=0.33
+  [R4] 代码 known-item (sample 40) …
+  ❌ [FAIL] R4 代码 known-item — file R@5=0.175
+  [R5] 过滤正确性 …
+  ✅ [PASS] R5 过滤正确性 — year>=2025 违例 0; venue 仅 ['arXiv']
+  [R6] 意图路由 …
+  ✅ [PASS] R6 意图路由 — intent acc=96% subtype acc=100%
+  [R7] 鲁棒性/负样本 …
+  ✅ [PASS] R7 鲁棒性/负样本 — 异常 0/4
+  ✅ [PASS] R8 检索延迟 — p50=0.987s p95=1.227s
+  → 总体: FAIL  (outputs/retrieval_quality.json)
+
+=== check_03 e5 前缀 A/B 诊断 ===
+  候选 L1=110, 查询标题=60
+  [A] 无前缀（复刻当前实现）…
+      A: R@1=98% R@5=100% MRR=0.989
+  [B] e5 规范前缀（query:/passage:）…
+      B: R@1=98% R@5=100% MRR=0.992
+  ✅ [PASS] E1 e5 前缀 A/B — 差异不显著 (ΔMRR=0.003)
+  → 总体: PASS  (outputs/embedding_prefix_ab.json)
+
+######## 完成 ########
+汇总: tests/outputs/summary.json
+报告: tests/REPORT.md

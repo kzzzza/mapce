@@ -1,0 +1,20 @@
+paper_id,title,has_code,code_indexed,indexed_at
+2103.07945,Learning One Representation to Optimize All Rewards,False,False,2026-06-10T18:15:20.868211+00:00
+2506.20487,A Survey of Behavior Foundation Model: Next-Generation Whole-Body Control System,False,False,2026-06-10T18:25:54.181129+00:00
+unknownNone_fast_imitation_via_behavior_foundation_models,FAST IMITATION VIA BEHAVIOR FOUNDATION MODELS,False,False,2026-06-10T18:45:00.401973+00:00
+2602.11399,Can We Really Learn One Representation to Optimize All Rewards?,False,False,2026-06-11T12:21:23.084822+00:00
+2511.19236,SENTINEL: A Fully End-to-End Language-Action Model for Humanoid Whole Body Contr,False,False,2026-06-11T12:59:53.917994+00:00
+2401.16889,2401.16889,False,False,2026-06-11T13:29:54.056914+00:00
+2510.15382,Towards Robust Zero-Shot Reinforcement Learning,False,False,2026-06-17T16:32:39.624322+00:00
+2511.14205,FreeMusco: Motion-Free Learning of Latent Control for Morphology-Adaptive Locomo,False,False,2026-06-17T16:44:53.894660+00:00
+2606.04829,M3imic: Learning a Versatile Whole-Body Controller for Multimodal Motion Mimicki,False,False,2026-06-17T16:51:58.362609+00:00
+unknownNone_unsupervised_zero-shot_reinforcement_learning_via_dual-value,UNSUPERVISED ZERO-SHOT REINFORCEMENT LEARNING VIA DUAL-VALUE FORWARD-BACKWARD RE,False,False,2026-06-17T16:57:22.509358+00:00
+2606.08548,OASIS: From Simulation Data Collection to Real-World Humanoid Loco-Manipulation,False,False,2026-06-18T07:36:50.263452+00:00
+2403.17346,TRAM: Global Trajectory and Motion of 3D Humans from in-the-wild Videos,False,False,2026-06-18T07:51:44.194569+00:00
+2605.15336,2605.15336,False,False,2026-06-18T08:03:32.686024+00:00
+2606.03985,2606.03985,False,False,2026-06-18T08:05:00.529724+00:00
+2606.12814,Stubborn: A Streamlined and Unified Reinforcement Learning Framework for Robust ,False,False,2026-06-18T08:13:24.524462+00:00
+2606.10340,OMG: Omni-Modal Motion Generation for Generalist Humanoid Control,False,False,2026-06-18T08:19:12.091913+00:00
+2605.19981,CEER: Compliant End-Effector and Root Control as a Unified Interface for Hierarc,False,False,2026-06-18T08:24:09.084973+00:00
+2606.05687,Accelerating and Scaling MPC-Guided Reinforcement Learning for Humanoid Locomoti,False,False,2026-06-18T08:26:39.714931+00:00
+2606.05873,LadderMan: Learning Humanoid Perceptive Ladder Climbing,False,False,2026-06-18T08:36:58.378307+00:00

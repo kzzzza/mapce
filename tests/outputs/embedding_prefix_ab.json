@@ -1,0 +1,35 @@
+{
+  "section": "embedding_prefix_ab",
+  "overall": "PASS",
+  "n_queries": 60,
+  "n_candidates": 110,
+  "checks": [
+    {
+      "name": "E1 e5 前缀 A/B",
+      "status": "PASS",
+      "metrics": {
+        "A_no_prefix": {
+          "recall@1": 0.9833,
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr": 0.9889
+        },
+        "B_e5_prefix": {
+          "recall@1": 0.9833,
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr": 0.9917
+        },
+        "delta": {
+          "d_recall@1": 0.0,
+          "d_recall@5": 0.0,
+          "d_mrr": 0.0028
+        }
+      },
+      "note": "差异不显著 (ΔMRR=0.003)"
+    }
+  ],
+  "qualitative": {
+    "hybrid_retrieval_status": "当前 retrieval.py 仅使用向量检索；fulltext_search(FTS) 列存在但从未被查询，README 宣称的‘向量+全文混合检索’暂未生效。"
+  }
+}

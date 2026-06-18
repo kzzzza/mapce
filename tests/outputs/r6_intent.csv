@@ -1,0 +1,25 @@
+query,gold_intent,pred_intent,gold_sub,pred_sub,intent_ok
+how does ASAP align simulation and real-world physics,paper_search,paper_search,general,general,True
+explain the loss function used for motion tracking,paper_search,paper_search,formula,formula,True
+benchmark results comparison of humanoid controllers,paper_search,paper_search,benchmark,benchmark,True
+show me the architecture diagram of the policy network,paper_search,paper_search,figure_lookup,figure_lookup,True
+what is a behavioral foundation model,paper_search,paper_search,general,general,True
+derivation of the forward-backward representation objective,paper_search,hybrid,formula,formula,False
+table of success rates across tasks,paper_search,paper_search,benchmark,benchmark,True
+pipeline figure of the retargeting method,paper_search,paper_search,figure_lookup,figure_lookup,True
+compare DeepMimic and AMP,paper_search,paper_search,general,general,True
+theorem about successor features convergence,paper_search,paper_search,formula,formula,True
+implement the PPO training loop in python,code_search,code_search,general,general,True
+how to run the training script,code_search,code_search,general,general,True
+class definition of the motion retargeting module,code_search,code_search,general,general,True
+github repository for OmniH2O,code_search,code_search,general,general,True
+the function that computes reward in pytorch,code_search,code_search,general,general,True
+clone and execute the repo,code_search,code_search,general,general,True
+write a script to load the checkpoint,code_search,code_search,general,general,True
+repository implementation of diffusion policy,code_search,code_search,general,general,True
+motion tracking,hybrid,hybrid,general,general,True
+humanoid,hybrid,hybrid,general,general,True
+retargeting,hybrid,hybrid,general,general,True
+zero-shot reinforcement learning,hybrid,hybrid,general,general,True
+loco-manipulation,hybrid,hybrid,general,general,True
+sim-to-real transfer,hybrid,hybrid,general,general,True

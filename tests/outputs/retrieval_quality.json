@@ -1,0 +1,130 @@
+{
+  "section": "retrieval_quality",
+  "overall": "FAIL",
+  "checks": [
+    {
+      "name": "R1 标题→论文",
+      "status": "PASS",
+      "metrics": {
+        "n": 104,
+        "recall@1": 0.9135,
+        "recall@5": 0.9904,
+        "recall@10": 0.9904,
+        "mrr": 0.9439
+      },
+      "note": "R@1=91% R@5=99% MRR=0.94"
+    },
+    {
+      "name": "R2 摘要首句→论文",
+      "status": "PASS",
+      "metrics": {
+        "n": 103,
+        "recall@1": 0.8932,
+        "recall@5": 0.932,
+        "recall@10": 0.9417,
+        "mrr": 0.9142
+      },
+      "note": "R@5=93% MRR=0.91"
+    },
+    {
+      "name": "R3 chunk 自检索",
+      "status": "FAIL",
+      "metrics": {
+        "n": 150,
+        "top1_paper_hit": 0.2933,
+        "recall@5": 0.38,
+        "mrr": 0.3298
+      },
+      "note": "top1 论文命中=29% MRR=0.33"
+    },
+    {
+      "name": "R4 代码 known-item",
+      "status": "FAIL",
+      "metrics": {
+        "n": 40,
+        "file_recall@5": 0.175,
+        "paper_recall@5": 0.175
+      },
+      "note": "file R@5=0.175"
+    },
+    {
+      "name": "R5 过滤正确性",
+      "status": "PASS",
+      "metrics": {
+        "year_coverage": 0.9636,
+        "distinct_venues": [
+          "arXiv"
+        ],
+        "year_filter_min": 2025,
+        "year_filter_results": 35,
+        "year_filter_violations": 0,
+        "year_filter_correct": true,
+        "venue_filter_testable": false
+      },
+      "note": "year>=2025 违例 0; venue 仅 ['arXiv']"
+    },
+    {
+      "name": "R6 意图路由",
+      "status": "PASS",
+      "metrics": {
+        "n": 24,
+        "intent_accuracy": 0.9583,
+        "subtype_accuracy": 1.0,
+        "confusion": {
+          "paper_search->paper_search": 9,
+          "paper_search->hybrid": 1,
+          "code_search->code_search": 8,
+          "hybrid->hybrid": 6
+        }
+      },
+      "note": "intent acc=96% subtype acc=100%"
+    },
+    {
+      "name": "R7 鲁棒性/负样本",
+      "status": "PASS",
+      "metrics": {
+        "queries": 4,
+        "errors": 0,
+        "detail": [
+          {
+            "query": "lattice quantum chromodynamics confineme",
+            "n_results": 39,
+            "top_paper": "2605.25546",
+            "error": ""
+          },
+          {
+            "query": "asdkjh qweoiu zxcmnv random gibberish to",
+            "n_results": 38,
+            "top_paper": "2401.16889",
+            "error": ""
+          },
+          {
+            "query": "   ",
+            "n_results": 31,
+            "top_paper": "2401.16889",
+            "error": ""
+          },
+          {
+            "query": "the",
+            "n_results": 34,
+            "top_paper": "2401.16889",
+            "error": ""
+          }
+        ]
+      },
+      "note": "异常 0/4"
+    },
+    {
+      "name": "R8 检索延迟",
+      "status": "PASS",
+      "metrics": {
+        "n": 104,
+        "p50_s": 0.987,
+        "p95_s": 1.227,
+        "max_s": 2.776,
+        "mean_s": 1.033
+      },
+      "note": "p50=0.987s p95=1.227s"
+    }
+  ]
+}
