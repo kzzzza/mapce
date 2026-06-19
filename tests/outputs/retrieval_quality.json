@@ -1,51 +1,51 @@
 {
   "section": "retrieval_quality",
-  "overall": "FAIL",
+  "overall": "WARN",
   "checks": [
     {
       "name": "R1 标题→论文",
       "status": "PASS",
       "metrics": {
         "n": 104,
-        "recall@1": 0.9135,
-        "recall@5": 0.9904,
-        "recall@10": 0.9904,
-        "mrr": 0.9439
+        "recall@1": 0.9231,
+        "recall@5": 0.9808,
+        "recall@10": 0.9808,
+        "mrr": 0.9519
       },
-      "note": "R@1=91% R@5=99% MRR=0.94"
+      "note": "R@1=92% R@5=98% MRR=0.95"
     },
     {
       "name": "R2 摘要首句→论文",
       "status": "PASS",
       "metrics": {
         "n": 103,
-        "recall@1": 0.8932,
-        "recall@5": 0.932,
-        "recall@10": 0.9417,
-        "mrr": 0.9142
+        "recall@1": 0.9709,
+        "recall@5": 0.9903,
+        "recall@10": 0.9903,
+        "mrr": 0.9806
       },
-      "note": "R@5=93% MRR=0.91"
+      "note": "R@5=99% MRR=0.98"
     },
     {
       "name": "R3 chunk 自检索",
-      "status": "FAIL",
+      "status": "WARN",
       "metrics": {
         "n": 150,
-        "top1_paper_hit": 0.2933,
-        "recall@5": 0.38,
-        "mrr": 0.3298
+        "top1_paper_hit": 0.8533,
+        "recall@5": 0.8933,
+        "mrr": 0.87
       },
-      "note": "top1 论文命中=29% MRR=0.33"
+      "note": "top1 论文命中=85% MRR=0.87"
     },
     {
       "name": "R4 代码 known-item",
-      "status": "FAIL",
+      "status": "WARN",
       "metrics": {
         "n": 40,
-        "file_recall@5": 0.175,
-        "paper_recall@5": 0.175
+        "file_recall@5": 0.65,
+        "paper_recall@5": 0.85
       },
-      "note": "file R@5=0.175"
+      "note": "file R@5=0.65"
     },
     {
       "name": "R5 过滤正确性",
@@ -56,7 +56,7 @@
           "arXiv"
         ],
         "year_filter_min": 2025,
-        "year_filter_results": 35,
+        "year_filter_results": 25,
         "year_filter_violations": 0,
         "year_filter_correct": true,
         "venue_filter_testable": false
@@ -88,26 +88,26 @@
         "detail": [
           {
             "query": "lattice quantum chromodynamics confineme",
-            "n_results": 39,
-            "top_paper": "2605.25546",
+            "n_results": 30,
+            "top_paper": "2509.16757",
             "error": ""
           },
           {
             "query": "asdkjh qweoiu zxcmnv random gibberish to",
-            "n_results": 38,
-            "top_paper": "2401.16889",
+            "n_results": 35,
+            "top_paper": "2104.02180",
             "error": ""
           },
           {
             "query": "   ",
-            "n_results": 31,
-            "top_paper": "2401.16889",
+            "n_results": 29,
+            "top_paper": "2605.15336",
             "error": ""
           },
           {
             "query": "the",
-            "n_results": 34,
-            "top_paper": "2401.16889",
+            "n_results": 41,
+            "top_paper": "2511.17373",
             "error": ""
           }
         ]
@@ -119,12 +119,12 @@
       "status": "PASS",
       "metrics": {
         "n": 104,
-        "p50_s": 0.987,
-        "p95_s": 1.227,
-        "max_s": 2.776,
-        "mean_s": 1.033
+        "p50_s": 1.22,
+        "p95_s": 1.292,
+        "max_s": 1.871,
+        "mean_s": 1.223
       },
-      "note": "p50=0.987s p95=1.227s"
+      "note": "p50=1.22s p95=1.292s"
     }
   ]
 }

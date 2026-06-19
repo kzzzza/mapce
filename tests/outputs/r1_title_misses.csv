@@ -1,10 +1,9 @@
 paper_id,title,rank
-2510.02252,Retargeting Matters: General Motion Retargeting for Humanoid Motion Tr,3
-2509.26633,OmniRetarget: Interaction-Preserving Data Generation for Humanoid Whol,4
+2510.02252,Retargeting Matters: General Motion Retargeting for Humanoid Motion Tr,2
+2509.26633,OmniRetarget: Interaction-Preserving Data Generation for Humanoid Whol,2
 2509.13833,Track Any Motions under Any Disturbances,2
-2103.07945,Learning One Representation to Optimize All Rewards,2
-2502.01143,ASAP: Aligning Simulation and Real-World Physics for Learning Agile Hu,3
+2103.07945,Learning One Representation to Optimize All Rewards,
+2502.01143,ASAP: Aligning Simulation and Real-World Physics for Learning Agile Hu,2
 2504.07896,Fast Adaptation with Behavioral Foundation Models,
-2504.11054,Zero-Shot Whole-Body Humanoid Control via Behavioral Foundation Models,4
+2504.11054,Zero-Shot Whole-Body Humanoid Control via Behavioral Foundation Models,2
 2406.10759,Humanoid Parkour Learning,2
-2510.15382,Towards Robust Zero-Shot Reinforcement Learning,2

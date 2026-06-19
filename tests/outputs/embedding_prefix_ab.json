@@ -9,10 +9,10 @@
       "status": "PASS",
       "metrics": {
         "A_no_prefix": {
-          "recall@1": 0.9833,
+          "recall@1": 0.9667,
           "recall@5": 1.0,
           "recall@10": 1.0,
-          "mrr": 0.9889
+          "mrr": 0.9806
         },
         "B_e5_prefix": {
           "recall@1": 0.9833,
@@ -21,12 +21,12 @@
           "mrr": 0.9917
         },
         "delta": {
-          "d_recall@1": 0.0,
+          "d_recall@1": 0.0166,
           "d_recall@5": 0.0,
-          "d_mrr": 0.0028
+          "d_mrr": 0.0111
         }
       },
-      "note": "差异不显著 (ΔMRR=0.003)"
+      "note": "差异不显著 (ΔMRR=0.011)"
     }
   ],
   "qualitative": {

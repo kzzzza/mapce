@@ -145,7 +145,12 @@ async def index_code(
     from mapce.core.chunking.code import chunk_repo
     from mapce.core.embedding import embed
     from mapce.db import get_connection, init_chunks, init_mapping, init_index_meta
-    from mapce.db.operations import insert_chunks, upsert_meta, get_meta
+    from mapce.db.operations import (
+        delete_chunks_by_repo_name,
+        get_meta,
+        insert_chunks,
+        upsert_meta,
+    )
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="mapce_repo_"))
     repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
@@ -173,6 +178,12 @@ async def index_code(
         chunks_table = init_chunks(db)
         meta_table = init_index_meta(db)
 
+        # Make re-indexing idempotent: code chunk_ids are deterministic
+        # (code:<paper>:<repo>:<type>:<idx>), so inserting again without first
+        # removing the prior copy duplicates every chunk. Delete by repo_name
+        # (chunks may be stored under whichever paper first indexed the repo).
+        removed = delete_chunks_by_repo_name(chunks_table, repo_name)
+
         insert_chunks(chunks_table, chunks)
 
         meta = get_meta(meta_table, paper_id)
@@ -188,7 +199,9 @@ async def index_code(
             "paper_id": paper_id,
             "repo_name": repo_name,
             "chunk_count": len(chunks),
-            "message": f"Indexed {len(chunks)} chunks from {repo_name}.",
+            "replaced_chunks": removed,
+            "message": f"Indexed {len(chunks)} chunks from {repo_name}"
+                       + (f" (replaced {removed} existing)." if removed else "."),
         })
 
     except Exception as e:

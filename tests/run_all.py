@@ -14,6 +14,57 @@ import check_03_embedding_prefix_ab as e
 
 ICON = {"PASS": "✅ PASS", "WARN": "⚠️ WARN", "FAIL": "❌ FAIL"}
 
+# --- 新手友好说明（折叠块，保持报告简洁） ---
+
+_GLOSSARY = """<details><summary>📖 新手名词速查（不懂 RAG/数据库先看这里）</summary>
+
+- **chunk（块）**：论文/代码被切成的小片段，是检索的最小单位。一篇论文会切成 L1=标题+摘要、L2=章节、L3=段落，外加图、表；代码切成文件/类/函数等。
+- **嵌入 / 向量（embedding）**：把一段文字用 AI 模型转成一串 1024 个数字。语义相近的文字，数字也相近——这就是"语义搜索"的基础。
+- **向量检索**：把你的问题也转成向量，再找库里数字最接近的 chunk。靠"意思像"而非"字一样"。
+- **Recall@k（召回率）**：正确答案出现在返回结果**前 k 条**里的比例。越高越好（如 R@5=99% 表示几乎每次正确答案都在前 5 条内）。
+- **MRR（平均倒数排名）**：正确答案排第 1 得 1 分、第 2 得 0.5 分、第 3 得 0.33……再求平均。越接近 1 表示排得越靠前。
+- **PASS / WARN / FAIL**：每项指标设了及格线，绿=达标、黄=偏低需关注、红=不合格。判定逻辑见 `tests/common.py` 的 `grade()`。
+</details>
+"""
+
+_DQ_GUIDE = """<details><summary>❓ 这 8 项数据质量检查分别在看什么</summary>
+
+> 数据质量 = "存进库里的东西本身干不干净、全不全"，与"搜得准不准"是两回事。
+
+- **D1 元数据完整性**：每篇论文的档案信息（标题/作者/年份/会议）是否齐全、正确。标题若错成一串编号，按标题就搜不到。
+- **D2 状态一致性**：每篇论文有个处理进度标记，检查是否有卡在"半成品"状态（如 code_pending）的。
+- **D3 chunk 完整性**：每篇是否都成功切出了"摘要块"，且记录的块数与实际存的对得上。
+- **D4 内容健康**：有没有空块、超短块，以及**重复的 chunk_id**（相当于数据库主键撞车，属硬伤）。
+- **D5 嵌入健康**：每个块的 1024 维向量是否都正常生成、没有缺失/全零/坏值——向量坏了语义搜索就废了。
+- **D6 特殊块**：论文里的图、表是否被正确提取并能定位到图片文件。
+- **D7 代码图谱**：代码块之间"谁调用谁"的关系是否被记录（用于顺着调用链扩展上下文）。
+- **D8 Paper↔Code 映射表**：论文里的"方法"与代码里的"实现"之间的对应关系表是否建立（双向检索特性的基础）。
+</details>
+"""
+
+_RQ_GUIDE = """<details><summary>❓ 这 8 项检索检查分别在看什么</summary>
+
+> 检索质量 = "给一个查询，库能不能把对的内容捞到、并排在前面"。这里用"已知正确答案"的查询来自动打分。
+
+- **R1 标题→论文**：拿论文标题当搜索词，看能否搜回这篇论文本身。最基本的"已知答案"测试。
+- **R2 摘要首句→论文**：拿摘要开头当搜索词（不含标题原词），测**语义理解**而非字面重复。
+- **R3 chunk 自检索**：拿某个段落的原文当搜索词，看能否定位回它所在的论文。测**细粒度（段落级）检索**。
+- **R4 代码 known-item**：拿代码符号/文件名当搜索词，看能否找到对应的代码文件。
+- **R5 过滤正确性**：加上"年份≥2025"这类筛选后，返回结果是否真的都满足条件。
+- **R6 意图路由**：系统能否判断你这句是想搜"论文"还是搜"代码"，并据此走不同检索路径。
+- **R7 鲁棒性/负样本**：输入乱码、空串、停用词时系统会不会报错、会不会乱返回一堆无关结果。
+- **R8 检索延迟**：一次搜索要多久（p50=一半查询快于此，p95=95% 查询快于此）。
+</details>
+"""
+
+_AB_GUIDE = """<details><summary>❓ 这个 A/B 实验在验证什么</summary>
+
+所用嵌入模型（e5）官方要求：搜索词前面加 `query: `、被检索文档前面加 `passage: `。当前代码两者都没加。
+本实验同一批查询各跑一遍"不加前缀（A）"和"加前缀（B）"，对比谁的 Recall/MRR 更高，来判断这个"缺前缀"到底有没有实质伤害。
+**结论是差异极小**，所以不必为它大动干戈（重嵌入全库）。
+</details>
+"""
+
 
 def _metrics_str(m: dict) -> str:
     parts = []
@@ -48,6 +99,7 @@ def render_report(dq: dict, rq: dict, ab: dict) -> str:
     L.append(f"- source 分布：{ov['source_type_distribution']}")
     L.append(f"- chunk 类型分布：{ov['chunk_type_distribution']}")
     L.append("")
+    L.append(_GLOSSARY)
 
     # 数据质量
     L.append("## 2. 数据质量结果 (D1–D8)\n")
@@ -56,6 +108,7 @@ def render_report(dq: dict, rq: dict, ab: dict) -> str:
     for c in dq["checks"]:
         L.append(f"| {c['name']} | {ICON[c['status']]} | {c['note']} |")
     L.append("")
+    L.append(_DQ_GUIDE)
     L.append("<details><summary>展开完整指标</summary>\n")
     for c in dq["checks"]:
         L.append(f"**{c['name']}** — {ICON[c['status']]}  \n{_metrics_str(c['metrics'])}\n")
@@ -68,6 +121,7 @@ def render_report(dq: dict, rq: dict, ab: dict) -> str:
     for c in rq["checks"]:
         L.append(f"| {c['name']} | {ICON[c['status']]} | {c['note']} |")
     L.append("")
+    L.append(_RQ_GUIDE)
     L.append("<details><summary>展开完整指标</summary>\n")
     for c in rq["checks"]:
         L.append(f"**{c['name']}** — {ICON[c['status']]}  \n{_metrics_str(c['metrics'])}\n")
@@ -86,6 +140,7 @@ def render_report(dq: dict, rq: dict, ab: dict) -> str:
     L.append(f"| **Δ (B−A)** | {m['delta']['d_recall@1']:+.0%} | {m['delta']['d_recall@5']:+.0%} | — | {m['delta']['d_mrr']:+.3f} |")
     L.append(f"\n结论：{ICON[ab['overall']]} — {abc['note']}\n")
     L.append(f"> {ab['qualitative']['hybrid_retrieval_status']}\n")
+    L.append(_AB_GUIDE)
 
     # 问题清单
     L.append("## 5. 问题清单与优先级\n")
