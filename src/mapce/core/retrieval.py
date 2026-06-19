@@ -256,108 +256,117 @@ def search(
 
     table = init_chunks(db)
 
-    # ---- Stage 1: Coarse screening on L1 chunks ----
+    # ---- Stage 1+2: Two-signal retrieval over the full corpus ----
+    #
+    # The previous design screened candidate papers by L1-abstract similarity
+    # (top_k_papers) and then searched L2/L3 *only within those papers*. On a
+    # homogeneous corpus that funnel dropped ~43% of deep paragraphs whose paper
+    # abstract didn't match the query, capping fine-grained recall (R3/R4).
+    #
+    # We instead combine two ungated signals and fuse them:
+    #   (a) L1 prior  — abstract-level similarity across ALL papers. Keeps
+    #       title/abstract (known-item) queries strong: the title lives only in
+    #       L1, so this is what lets a paper's own title find it.
+    #   (b) Fine hits — direct L2/L3 vector search across ALL papers, so deep
+    #       paragraphs are reachable regardless of how well the abstract matched.
+    # The candidate set seeds from both; each paper's prior is max(L1, fine) so a
+    # paper wins if *either* its abstract or any of its paragraphs matches.
+    # year/venue filters move down onto the chunk query (base fields propagate
+    # to every paper chunk).
 
     query_emb = embed_single(query)
 
-    l1_where = "chunk_type = 'paper_l1'"
+    def _vsearch(where: str, limit: int) -> list[dict]:
+        try:
+            return table.search(query_emb).where(where).limit(limit).to_list()
+        except Exception:
+            # Fallback: non-vector scan (e.g. if the vector index is unavailable)
+            return table.search().where(where).limit(limit).to_list()
+
+    # Paper prior = best chunk similarity + a light L1 "known-item anchor".
+    #
+    #   prior(p) = max_chunk 1/(1+distance)            # how close the *best*
+    #                                                  #   matching chunk of p is
+    #            + L1_ANCHOR_W / (L1_ANCHOR_K + rank)  # bonus if p's abstract is
+    #                                                  #   a top L1 match
+    #
+    # The similarity term lets an exact/near paragraph match win deep queries
+    # (the title is not in any paragraph, so a topic-diluted abstract can't beat
+    # it). The small anchor term only decides near-ties — precisely the
+    # known-item/title case, where the answer's abstract tops the L1 list but its
+    # similarity is a hair behind some distractor paragraph. This combination
+    # keeps title→paper recall high *and* makes deep paragraphs reachable, which
+    # pure distance fusion or pure RRF each sacrifice one of. (Swept empirically.)
+    L1_ANCHOR_W = 2.0
+    L1_ANCHOR_K = 60
+
+    def _best_sim(rows: list[dict]) -> dict[str, float]:
+        """Max similarity (1/(1+distance)) per paper_id across the given rows."""
+        sims: dict[str, float] = {}
+        for i, r in enumerate(rows):
+            pid = r.get("paper_id")
+            if not pid:
+                continue
+            dist = r.get("_distance")
+            v = 1.0 / (1.0 + dist) if dist is not None else 1.0 / (1.0 + i)
+            if pid not in sims or v > sims[pid]:
+                sims[pid] = v
+        return sims
+
+    def _l1_anchor(l1_rows: list[dict]) -> dict[str, float]:
+        """First-occurrence anchor bonus per paper_id from the L1 ranked list."""
+        anchor: dict[str, float] = {}
+        for i, r in enumerate(l1_rows):
+            pid = r.get("paper_id")
+            if pid and pid not in anchor:
+                anchor[pid] = L1_ANCHOR_W / (L1_ANCHOR_K + i)
+        return anchor
+
+    paper_filter = ""
     if intent.filters.get("year_min"):
-        l1_where += f" AND year >= {intent.filters['year_min']}"
+        paper_filter += f" AND year >= {intent.filters['year_min']}"
     if intent.filters.get("year_max"):
-        l1_where += f" AND year <= {intent.filters['year_max']}"
+        paper_filter += f" AND year <= {intent.filters['year_max']}"
     if intent.filters.get("venue"):
-        l1_where += f" AND venue = {sql_str(intent.filters['venue'])}"
+        paper_filter += f" AND venue = {sql_str(intent.filters['venue'])}"
 
-    try:
-        l1_results = (
-            table.search(query_emb)
-            .where(l1_where)
-            .limit(top_k_papers)
-            .to_list()
-        )
-    except Exception:
-        # Fallback: try without vector search
-        l1_results = (
-            table.search()
-            .where(l1_where)
-            .limit(top_k_papers)
-            .to_list()
-        )
+    # Wider pool than top_k_chunks since hits span L2 and L3 granularities.
+    paper_limit = top_k_chunks * 3
 
-    paper_ids = [r["paper_id"] for r in l1_results]
-    paper_scores = {r["paper_id"]: 1.0 - i / max(len(l1_results), 1) for i, r in enumerate(l1_results)}
-
-    # ---- Stage 2: Fine ranking ----
-
-    if intent.intent == "paper_search":
-        # Search L2 *and* L3 chunks within the paper candidate set. L3 paragraphs
-        # past the L2 truncation point only exist at L3, so coarse screening must
-        # cover them directly; Stage-3 dedup drops anything re-expanded.
-        l2_where_parts = ["chunk_type IN ('paper_l2', 'paper_l3')"]
-        if paper_ids:
-            l2_where_parts.append(f"paper_id IN ({sql_in_list(paper_ids)})")
-        l2_where = " AND ".join(l2_where_parts)
-
-        # Pull a wider candidate pool since it now spans two granularities.
-        paper_limit = top_k_chunks * 3
-
-        try:
-            l2_results = (
-                table.search(query_emb)
-                .where(l2_where)
-                .limit(paper_limit)
-                .to_list()
-            )
-        except Exception:
-            l2_results = (
-                table.search()
-                .where(l2_where)
-                .limit(paper_limit)
-                .to_list()
-            )
-
-    elif intent.intent == "code_search":
-        # Search code L2 chunks within papers that have code
-        code_where_parts = ["chunk_type IN ('code_l2', 'code_l3')"]
-        if paper_ids:
-            code_where_parts.append(f"paper_id IN ({sql_in_list(paper_ids)})")
-        code_where = " AND ".join(code_where_parts)
-
-        try:
-            l2_results = (
-                table.search(query_emb)
-                .where(code_where)
-                .limit(top_k_chunks)
-                .to_list()
-            )
-        except Exception:
-            l2_results = (
-                table.search()
-                .where(code_where)
-                .limit(top_k_chunks)
-                .to_list()
-            )
+    if intent.intent == "code_search":
+        # Code queries don't benefit from the L1 (paper abstract) anchor; rank by
+        # best code-chunk similarity over the whole corpus.
+        l2_results = _vsearch("chunk_type IN ('code_l2', 'code_l3')", paper_limit)
+        paper_scores = _best_sim(l2_results)
     else:
-        # hybrid: search both
-        paper_where = " AND ".join([
-            "chunk_type IN ('paper_l2', 'paper_l3')",
-            f"paper_id IN ({sql_in_list(paper_ids)})" if paper_ids else "1=1",
-        ])
-        code_where = " AND ".join([
-            "chunk_type IN ('code_l2', 'code_l3')",
-            f"paper_id IN ({sql_in_list(paper_ids)})" if paper_ids else "1=1",
-        ])
+        # (a) L1 abstract list + (b) fine L2/L3 hits, both across all papers.
+        l1_hits = _vsearch("chunk_type = 'paper_l1'" + paper_filter, top_k_papers * 100)
+        fine_hits = _vsearch(
+            "chunk_type IN ('paper_l2', 'paper_l3')" + paper_filter, paper_limit
+        )
+        # Candidate set = fine paragraph hits + the top L1 papers as known-item
+        # anchors. _expand_context dedups by chunk_id; ordering comes from the
+        # fused prior below, not list position.
+        seed_l1 = l1_hits[:top_k_chunks]
+        sim_rows = l1_hits + fine_hits
+        if intent.intent == "hybrid":
+            code_hits = _vsearch("chunk_type IN ('code_l2', 'code_l3')", top_k_chunks)
+            sim_rows = sim_rows + code_hits
+            l2_results = fine_hits + code_hits + seed_l1
+        else:
+            l2_results = fine_hits + seed_l1
 
-        try:
-            paper_results = table.search(query_emb).where(paper_where).limit(top_k_chunks // 2).to_list()
-        except Exception:
-            paper_results = table.search().where(paper_where).limit(top_k_chunks // 2).to_list()
-        try:
-            code_results = table.search(query_emb).where(code_where).limit(top_k_chunks // 2).to_list()
-        except Exception:
-            code_results = table.search().where(code_where).limit(top_k_chunks // 2).to_list()
+        sims = _best_sim(sim_rows)
+        anchor = _l1_anchor(l1_hits)
+        paper_scores = {
+            pid: sims.get(pid, 0.0) + anchor.get(pid, 0.0)
+            for pid in set(sims) | set(anchor)
+        }
 
-        l2_results = paper_results + code_results
+    # Order candidates by fused paper prior so _expand_context's positional
+    # weighting aligns with relevance (a paper with a strong fine hit floats to
+    # the front regardless of whether it was an L1 seed or a deep paragraph).
+    l2_results.sort(key=lambda r: paper_scores.get(r.get("paper_id"), 0.0), reverse=True)
 
     # ---- Stage 3: Context expansion ----
 
