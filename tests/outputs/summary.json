@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-19T14:05:57",
+  "generated_at": "2026-06-19T15:38:40",
   "overall": {
     "data_quality": "FAIL",
     "retrieval_quality": "WARN",
@@ -104,7 +104,7 @@
         "metrics": {
           "figure_chunks": 1048,
           "table_chunks": 477,
-          "figures_missing_path": 1006,
+          "figures_missing_path": 66,
           "papers_with_figures": 107,
           "papers_total": 110
         },
@@ -257,12 +257,12 @@
         "status": "PASS",
         "metrics": {
           "n": 104,
-          "p50_s": 1.22,
-          "p95_s": 1.292,
-          "max_s": 1.871,
-          "mean_s": 1.223
+          "p50_s": 1.689,
+          "p95_s": 1.742,
+          "max_s": 2.419,
+          "mean_s": 1.686
         },
-        "note": "p50=1.22s p95=1.292s"
+        "note": "p50=1.689s p95=1.742s"
       }
     ]
   },

@@ -97,7 +97,7 @@
       "metrics": {
         "figure_chunks": 1048,
         "table_chunks": 477,
-        "figures_missing_path": 1006,
+        "figures_missing_path": 66,
         "papers_with_figures": 107,
         "papers_total": 110
       },

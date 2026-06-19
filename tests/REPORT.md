@@ -1,6 +1,6 @@
 # MAPCE 索引库 数据质量 & 检索质量 测试报告
 
-> 生成时间：2026-06-19 14:05  ·  脚本：`tests/check_0{1,2,3}.py`  ·  全程只读，未改动 `~/.mapce/data`
+> 生成时间：2026-06-19 15:38  ·  脚本：`tests/check_0{1,2,3}.py`  ·  全程只读，未改动 `~/.mapce/data`
 
 ## 0. 总体结论
 
@@ -71,7 +71,7 @@
 `embedding_coverage`=1.0; `null_embeddings`=0; `wrong_dim`=0; `zero_vectors`=0; `nan_inf_vectors`=0
 
 **D6 特殊块(图/表)** — ⚠️ WARN  
-`figure_chunks`=1048; `table_chunks`=477; `figures_missing_path`=1006; `papers_with_figures`=107; `papers_total`=110
+`figure_chunks`=1048; `table_chunks`=477; `figures_missing_path`=66; `papers_with_figures`=107; `papers_total`=110
 
 **D7 代码图谱** — ⚠️ WARN  
 `code_chunks`=40410; `symbol_missing_rate(l2-l5)`=0.0908; `chunks_with_calls`=0; `chunks_with_called_by`=0; `total_graph_edges`=0; `orphan_reference_rate`=0.0; `chunks_with_associated_test`=0; `callgraph_populated`=False
@@ -92,7 +92,7 @@
 | R5 过滤正确性 | ✅ PASS | year>=2025 违例 0; venue 仅 ['arXiv'] |
 | R6 意图路由 | ✅ PASS | intent acc=96% subtype acc=100% |
 | R7 鲁棒性/负样本 | ✅ PASS | 异常 0/4 |
-| R8 检索延迟 | ✅ PASS | p50=1.22s p95=1.292s |
+| R8 检索延迟 | ✅ PASS | p50=1.689s p95=1.742s |
 
 <details><summary>❓ 这 8 项检索检查分别在看什么</summary>
 
@@ -132,7 +132,7 @@
 `queries`=4; `errors`=0; `detail`=[{'query': 'lattice quantum chromodynamics confineme', 'n_results': 30, 'top_paper': '2509.16757', 'error': ''}, {'query': 'asdkjh qweoiu zxcmnv random gibberish to', 'n_results': 35, 'top_paper': '2104.02180', 'error': ''}, {'query': '   ', 'n_results': 29, 'top_paper': '2605.15336', 'error': ''}, {'query': 'the', 'n_results': 41, 'top_paper': '2511.17373', 'error': ''}]
 
 **R8 检索延迟** — ✅ PASS  
-`n`=104; `p50_s`=1.22; `p95_s`=1.292; `max_s`=1.871; `mean_s`=1.223
+`n`=104; `p50_s`=1.689; `p95_s`=1.742; `max_s`=2.419; `mean_s`=1.686
 
 </details>
 
