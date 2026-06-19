@@ -1,6 +1,6 @@
 # MAPCE 索引库 数据质量 & 检索质量 测试报告
 
-> 生成时间：2026-06-19 15:38  ·  脚本：`tests/check_0{1,2,3}.py`  ·  全程只读，未改动 `~/.mapce/data`
+> 生成时间：2026-06-19 18:14  ·  测试脚本：`tests/check_0{1,2,3}.py`（只读）  ·  修复进度见 §0.5
 
 ## 0. 总体结论
 
@@ -9,6 +9,30 @@
 | 数据质量 (D1–D8) | ❌ FAIL |
 | 检索质量 (R1–R8) | ⚠️ WARN |
 | e5 前缀 A/B 诊断 | ✅ PASS |
+
+## 0.5 修复进度
+
+针对首轮测试发现的问题，已落地的修复（均**不需重跑论文解析、不重嵌入**）：
+
+| 状态 | 修复 | 解决的问题 | 改动/脚本 | 提交 |
+|------|------|-----------|-----------|------|
+| ✅ 已修 | F1 检索粗筛改造 | R3 段落自检索 29%→85%、R4 代码 17.5%→65%（去掉 L1 top-20 候选门，改全库检索+相似度/已知项融合） | `core/retrieval.py` | `1ff9465` |
+| ✅ 已修 | F5 代码去重 | D4 重复 chunk_id 1067→0（index_code 改幂等 + 一次性清理） | `mcp/_handlers.py`、`scripts/dedup_code_chunks.py` | `7ef6607` |
+| ✅ 已修 | 图片路径回填 | D6 图片缺路径 1006→66 / 1048（从磁盘 MinerU 输出回填 figure_path/table_image） | `scripts/backfill_figure_paths.py` | `c8cac99` |
+
+尚未修复（本轮未选；保留为已知问题）：
+
+| 状态 | 问题 | 对应检查 | 建议修复 |
+|------|------|----------|----------|
+| ⏳ 待修 | Paper↔Code 映射表为空 | D8 (FAIL) | F7：index_code 调用 mapper subagent 写映射表 |
+| ⏳ 待修 | 代码调用图谱未填充 | D7 (WARN) | F6：chunker 解析并解析 calls/called_by 到 chunk_id |
+| ⏳ 待修 | 标题(6 篇)/作者(全缺) | D1 (WARN) | F4：索引时调 get_arxiv_metadata 并回填 |
+| ⏳ 待修 | 19 篇卡 code_pending | D2 (WARN) | F8：收敛状态机 + 回填 status |
+| ⏳ 待修 | 图片剩 66 张/表 47 张无路径 | D6 (WARN) | 调整少数论文的图注/图片匹配规则 |
+| ⊘ 主动跳过 | e5 query/passage 前缀 | E1 (PASS) | A/B 实测 ΔMRR 仅 ~0.01，不显著，跳过 |
+
+> 注：本节由 `tests/run_all.py` 渲染。修复用脚本 `scripts/dedup_code_chunks.py`、`scripts/backfill_figure_paths.py`
+> 会改动 `~/.mapce/data`（执行前已备份）；而三个 `check_0*.py` 测试脚本本身只读。
 
 ## 1. 索引概览
 
