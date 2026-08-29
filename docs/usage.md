@@ -68,6 +68,12 @@ print(asyncio.run(get_stats()))
 print(asyncio.run(list_indexed_papers()))
 ```
 
+`get_stats` 的 `vector_index` 字段会返回 IVF_PQ/标量索引、已覆盖行数、未覆盖行数和当前查询参数。命令行也可以只读检查：
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py
+```
+
 ## MCP 工具参考
 
 ### search_papers
@@ -127,7 +133,7 @@ print(asyncio.run(list_indexed_papers()))
 |------|------|-------------|
 | `list_indexed_papers` | 列出所有已索引论文及状态 | 索引库里有哪些论文 |
 | `delete_paper` | 删除论文 (`paper_id`) | 把 2303.04137 删掉 |
-| `get_stats` | 索引统计（论文数、代码数、chunk 数） | 索引库现在多大 |
+| `get_stats` | 索引统计（论文、代码、chunk、向量索引覆盖率） | 索引库现在多大 |
 
 ## MCP Server（Claude Code 集成）
 

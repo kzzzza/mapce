@@ -336,6 +336,7 @@ async def delete_paper(paper_id: str) -> str:
 
 async def get_stats() -> str:
     """Get index statistics."""
+    from mapce.core.vector_index import index_report
     from mapce.db import get_connection, init_chunks, init_index_meta
     from mapce.db.operations import list_all_meta
 
@@ -359,4 +360,5 @@ async def get_stats() -> str:
         "papers_with_code": papers_with_code,
         "code_status_distribution": code_status_counts,
         "total_chunks": total_chunks,
+        "vector_index": index_report(chunks_table),
     }, ensure_ascii=False)

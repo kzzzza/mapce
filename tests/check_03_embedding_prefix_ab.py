@@ -57,7 +57,7 @@ def _eval(query_texts, gold_pids, cand_texts, cand_pids, q_prefix, c_prefix):
 
 def run() -> dict:
     print("\n=== check_03 e5 前缀 A/B 诊断 ===")
-    tbl = C.load_chunks_arrow()
+    tbl = C.load_chunks_arrow(["chunk_type", "paper_id", "content"])
     meta = C.load_meta()
     chunk_type = C.col(tbl, "chunk_type")
     paper_id = C.col(tbl, "paper_id")

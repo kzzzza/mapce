@@ -15,6 +15,7 @@ from typing import Any
 import lancedb
 
 from mapce.core.embedding import embed_single
+from mapce.core.vector_index import configure_vector_query, has_vector_index
 from mapce.db import get_connection, get_meta, init_chunks, init_index_meta, sql_in_list, sql_str
 
 
@@ -63,6 +64,19 @@ class RetrievalResult:
     figure_path: str | None = None
     table_markdown: str | None = None
     config_keys: list[str] = field(default_factory=list)
+
+
+# Never copy the 1024-float embedding back into Python result dictionaries.
+# ``_distance`` is explicitly projected for vector searches; LanceDB currently
+# auto-projects it, but making it explicit keeps behavior stable across SDK
+# versions.
+_RESULT_COLUMNS = [
+    "chunk_id", "chunk_type", "paper_id", "title", "authors", "year",
+    "venue", "section_path", "content", "repo_name", "repo_url",
+    "file_path", "language", "calls", "called_by", "associated_test",
+    "figure_path", "table_markdown", "config_keys",
+]
+_VECTOR_RESULT_COLUMNS = [*_RESULT_COLUMNS, "_distance"]
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +292,7 @@ def search(
         return [], intent
 
     table = init_chunks(db)
+    vector_indexed = has_vector_index(table)
 
     # ---- Stage 1+2: Two-signal retrieval over the full corpus ----
     #
@@ -301,7 +316,16 @@ def search(
 
     def _vsearch(where: str, limit: int) -> list[dict]:
         try:
-            return table.search(query_emb).where(where).limit(limit).to_list()
+            vector_query = (
+                table.search(query_emb)
+                .where(where, prefilter=True)
+                .select(_VECTOR_RESULT_COLUMNS)
+                .limit(limit)
+            )
+            vector_query = configure_vector_query(
+                vector_query, indexed=vector_indexed
+            )
+            return vector_query.to_list()
         except Exception as exc:
             raise VectorSearchError(
                 "Vector search failed; no fallback results were returned."
@@ -468,7 +492,11 @@ def _expand_context(
             try:
                 l3_rows = (
                     table.search()
-                    .where(f"paper_id = {sql_str(paper_id)} AND chunk_type = 'paper_l3'")
+                    .where(
+                        f"paper_id = {sql_str(paper_id)} AND chunk_type = 'paper_l3'",
+                        prefilter=True,
+                    )
+                    .select(_RESULT_COLUMNS)
                     .limit(20)
                     .to_list()
                 )
@@ -489,7 +517,11 @@ def _expand_context(
                 try:
                     fig_rows = (
                         table.search()
-                        .where(f"paper_id = {sql_str(paper_id)} AND chunk_type = 'figure'")
+                        .where(
+                            f"paper_id = {sql_str(paper_id)} AND chunk_type = 'figure'",
+                            prefilter=True,
+                        )
+                        .select(_RESULT_COLUMNS)
                         .limit(3)
                         .to_list()
                     )
@@ -504,7 +536,11 @@ def _expand_context(
                 try:
                     tbl_rows = (
                         table.search()
-                        .where(f"paper_id = {sql_str(paper_id)} AND chunk_type = 'table'")
+                        .where(
+                            f"paper_id = {sql_str(paper_id)} AND chunk_type = 'table'",
+                            prefilter=True,
+                        )
+                        .select(_RESULT_COLUMNS)
                         .limit(3)
                         .to_list()
                     )
@@ -529,8 +565,10 @@ def _expand_context(
                         .where(
                             f"paper_id = {sql_str(paper_id)} AND repo_name = {sql_str(repo)} "
                             + (f"AND repo_url = {sql_str(repo_url)} " if repo_url else "")
-                            + f"AND file_path = {sql_str(file_path)} AND chunk_type IN ('code_l3', 'code_l4')"
+                            + f"AND file_path = {sql_str(file_path)} AND chunk_type IN ('code_l3', 'code_l4')",
+                            prefilter=True,
                         )
+                        .select(_RESULT_COLUMNS)
                         .limit(15)
                         .to_list()
                     )
@@ -549,7 +587,8 @@ def _expand_context(
                 try:
                     call_rows = (
                         table.search()
-                        .where(f"chunk_id = {sql_str(call_id)}")
+                        .where(f"chunk_id = {sql_str(call_id)}", prefilter=True)
+                        .select(_RESULT_COLUMNS)
                         .limit(1)
                         .to_list()
                     )
@@ -565,7 +604,8 @@ def _expand_context(
                 try:
                     test_rows = (
                         table.search()
-                        .where(f"chunk_id = {sql_str(test_id)}")
+                        .where(f"chunk_id = {sql_str(test_id)}", prefilter=True)
+                        .select(_RESULT_COLUMNS)
                         .limit(1)
                         .to_list()
                     )

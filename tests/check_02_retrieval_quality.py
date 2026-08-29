@@ -54,7 +54,10 @@ def run() -> dict:
     print("\n=== check_02 检索质量 (R1–R8) ===")
     from mapce.core.retrieval import search_papers, search_code, parse_intent
 
-    tbl = C.load_chunks_arrow()
+    tbl = C.load_chunks_arrow([
+        "chunk_type", "paper_id", "content", "title", "year", "venue",
+        "chunk_id", "repo_name", "file_path", "symbol_name",
+    ])
     meta = C.load_meta()
     chunk_type = C.col(tbl, "chunk_type")
     paper_id = C.col(tbl, "paper_id")

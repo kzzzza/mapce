@@ -102,6 +102,8 @@ PDF/arXiv → MinerU 解析 → chunking → embedding → LanceDB
 阶段 4：结果组装 → 结构化注入 prompt，控制 token 预算
 ```
 
+`chunks.embedding` 使用 IVF_PQ（24 分区、128 个 PQ 子向量）生成候选；查询默认探测 16 个分区并以 `refine_factor=8` 用原始向量精排。`chunk_type`、`paper_id`、`repo_name`、`repo_url`、`year`、`venue` 另建标量索引支持预过滤。结果投影明确排除 1024 维 `embedding`，避免把无关大字段复制到 Python。
+
 ### 数据库
 
 LanceDB 有四张表：`chunks` 存放论文和代码分块，`paper_code_repos` 存放论文—仓库关联，`paper_code_mapping` 可选存放论文方法—代码符号映射，`index_meta` 存放索引元信息。
@@ -111,6 +113,7 @@ LanceDB 有四张表：`chunks` 存放论文和代码分块，`paper_code_repos`
 - **去重**：arxiv_id 精确 → doi 精确 → title 向量相似度 > 0.95
 - **状态机**：论文使用 pending → chunking → complete | failed；代码进度独立使用 `code_status`
 - **删除**：级联检查，共享代码块保留、独有代码块删除
+- **向量索引维护**：chunk 批次写入成功后自动创建或刷新 IVF_PQ/标量索引；维护失败不回滚已经写好的论文，未覆盖行仍由 LanceDB 的兼容扫描路径检索
 
 ## 添加新的数据源
 

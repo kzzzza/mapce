@@ -68,6 +68,12 @@ print(asyncio.run(get_stats()))
 print(asyncio.run(list_indexed_papers()))
 ```
 
+The `vector_index` field returned by `get_stats` includes IVF_PQ/scalar indices, indexed and unindexed row counts, and effective query parameters. The same information is available from the read-only CLI:
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py
+```
+
 ## MCP Tool Reference
 
 ### search_papers
@@ -127,7 +133,7 @@ print(asyncio.run(list_indexed_papers()))
 |------|-------------|--------------------------|
 | `list_indexed_papers` | List all indexed papers with status | What papers are in my index? |
 | `delete_paper` | Delete a paper by `paper_id` | Remove paper 2303.04137 |
-| `get_stats` | Index statistics (papers, code, chunks) | How big is my index? |
+| `get_stats` | Index statistics (papers, code, chunks, vector coverage) | How big is my index? |
 
 ## MCP Server (Claude Code Integration)
 

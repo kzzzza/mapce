@@ -51,7 +51,7 @@ LanceDB uses columnar compression, so actual disk usage is much smaller than raw
 | Metadata + mappings | < 1 MB |
 | **Per paper + code total** | **~8–20 MB** |
 
-> **Real-world reference**: current index of 28 papers (18 with code), `chunks.lance/` ≈ 239 MB, averaging ~8.5 MB per paper.
+> **Measured reference (2026-08)**: the current index contains 200 papers and 88,351 chunks. `chunks.lance/` is about 535 MB after IVF_PQ and filter indices, versus about 520 MB before indexing.
 
 ### Lifecycle
 
@@ -73,6 +73,31 @@ After reviewing the counts, apply the migration. Metadata tables are backed up f
 ```bash
 .venv/bin/python scripts/migrate_code_associations.py --apply
 ```
+
+### Vector Index Management
+
+Inspect the current configuration and coverage without writing:
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py
+```
+
+Build IVF_PQ and scalar prefilter indices from stored embeddings:
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py --apply
+```
+
+Defaults are 24 IVF partitions, 128 PQ sub-vectors, and L2 distance. Queries probe 16 partitions and refine 8x candidates with original vectors. On the current corpus this preserved 98.25% of exact top-k candidates without losing measured known-item hits. No embeddings are regenerated.
+
+New paper/code batches automatically refresh index coverage. Manual refresh and rebuild commands are also available:
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py --apply --refresh
+.venv/bin/python scripts/manage_vector_index.py --apply --replace
+```
+
+Configuration variables: `MAPCE_VECTOR_NUM_PARTITIONS`, `MAPCE_VECTOR_NUM_SUB_VECTORS`, `MAPCE_VECTOR_NPROBES`, `MAPCE_VECTOR_REFINE_FACTOR`, and `MAPCE_VECTOR_MIN_ROWS`. Set `MAPCE_AUTO_VECTOR_INDEX=0` to disable automatic maintenance.
 
 ---
 

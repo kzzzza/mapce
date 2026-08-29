@@ -102,6 +102,8 @@ Stage 3: Context expansion → L3 paragraphs + neighbor chains + figure/table la
 Stage 4: Result assembly → structured prompt injection with token budget control
 ```
 
+`chunks.embedding` uses IVF_PQ (24 partitions, 128 PQ sub-vectors) for candidate generation. Queries probe 16 partitions and use `refine_factor=8` to rerank with original vectors. Scalar indices on `chunk_type`, `paper_id`, `repo_name`, `repo_url`, `year`, and `venue` accelerate prefilters. Result projections explicitly exclude the 1024-float embedding column.
+
 ### Database
 
 Four LanceDB tables are used: `chunks` stores paper and code chunks, `paper_code_repos` stores paper-to-repository associations, `paper_code_mapping` optionally stores method-to-symbol links, and `index_meta` stores indexing metadata.
@@ -111,6 +113,7 @@ Four LanceDB tables are used: `chunks` stores paper and code chunks, `paper_code
 - **Dedup**: arxiv_id exact → doi exact → title vector similarity > 0.95
 - **State machine**: papers use pending → chunking → complete | failed; code progress uses the independent `code_status`
 - **Deletion**: cascading check — shared code chunks preserved, exclusive ones removed
+- **Vector maintenance**: each successful chunk batch creates or refreshes IVF_PQ/scalar indices as needed; maintenance failure never rolls back valid paper data, and LanceDB still searches uncovered rows through its compatibility path
 
 ## Adding a Data Source
 

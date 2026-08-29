@@ -38,6 +38,11 @@ def insert_chunks(table: Any, rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
     table.add(rows)
+    # Existing IVF/scalar indices do not immediately cover appended rows in
+    # LanceDB OSS. Keep the index current after every paper/code batch; the
+    # helper is best-effort so a maintenance issue never rolls back valid data.
+    from mapce.core.vector_index import maintain_vector_indices_after_write
+    maintain_vector_indices_after_write(table)
     return len(rows)
 
 

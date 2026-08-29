@@ -51,7 +51,7 @@ LanceDB 采用列式压缩存储，实际磁盘占用远小于向量原始大小
 | 元数据 + 映射 | < 1 MB |
 | **单篇论文 + 代码合计** | **~8–20 MB** |
 
-> **实测参考**：当前索引 28 篇论文（18 篇含代码），`chunks.lance/` 约 239 MB，平均每篇 ~8.5 MB。
+> **实测参考（2026-08）**：当前索引 200 篇论文、88,351 条 chunk，建立 IVF_PQ 与过滤索引后 `chunks.lance/` 约 535 MB；索引前约 520 MB，辅助索引增加约 15 MB。
 
 ### 生命周期
 
@@ -73,6 +73,31 @@ LanceDB 采用列式压缩存储，实际磁盘占用远小于向量原始大小
 ```bash
 .venv/bin/python scripts/migrate_code_associations.py --apply
 ```
+
+### 向量索引管理
+
+默认命令只读显示索引覆盖率和实际参数：
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py
+```
+
+为现有向量创建 IVF_PQ 和查询过滤索引：
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py --apply
+```
+
+默认配置为 24 个 IVF 分区、128 个 PQ 子向量、L2 距离；查询扫描 16 个分区并对 8 倍候选做原始向量精排。当前库实测保留 98.25% 的精确 Top-K 候选，并保持已知项命中不变。建立索引只读取现有向量，不重新生成 embedding。
+
+新增论文或代码写入后会自动执行索引维护，使 `num_unindexed_rows` 回到 0。也可手动刷新或重建：
+
+```bash
+.venv/bin/python scripts/manage_vector_index.py --apply --refresh
+.venv/bin/python scripts/manage_vector_index.py --apply --replace
+```
+
+可用环境变量：`MAPCE_VECTOR_NUM_PARTITIONS`、`MAPCE_VECTOR_NUM_SUB_VECTORS`、`MAPCE_VECTOR_NPROBES`、`MAPCE_VECTOR_REFINE_FACTOR`、`MAPCE_VECTOR_MIN_ROWS`。设置 `MAPCE_AUTO_VECTOR_INDEX=0` 可关闭入库后的自动维护。
 
 ---
 
