@@ -75,7 +75,7 @@ async def search_code(
     """Search indexed code chunks."""
     from mapce.core.retrieval import search_code as _search_code
 
-    results, intent = _search_code(query=query, top_k=top_k)
+    results, intent = _search_code(query=query, top_k=top_k, repo_name=repo_name)
 
     if not results:
         return json.dumps({
@@ -146,7 +146,7 @@ async def index_code(
     from mapce.core.embedding import embed
     from mapce.db import get_connection, init_chunks, init_mapping, init_index_meta
     from mapce.db.operations import (
-        delete_chunks_by_repo_name,
+        delete_chunks_by_repo,
         get_meta,
         insert_chunks,
         upsert_meta,
@@ -178,11 +178,11 @@ async def index_code(
         chunks_table = init_chunks(db)
         meta_table = init_index_meta(db)
 
-        # Make re-indexing idempotent: code chunk_ids are deterministic
-        # (code:<paper>:<repo>:<type>:<idx>), so inserting again without first
-        # removing the prior copy duplicates every chunk. Delete by repo_name
-        # (chunks may be stored under whichever paper first indexed the repo).
-        removed = delete_chunks_by_repo_name(chunks_table, repo_name)
+        # Make re-indexing idempotent without touching another paper that happens
+        # to reference the same repository (or an unrelated repository with the
+        # same basename). Code chunk IDs include paper_id, so the replacement
+        # scope must match that ownership boundary.
+        removed = delete_chunks_by_repo(chunks_table, paper_id, repo_name)
 
         insert_chunks(chunks_table, chunks)
 

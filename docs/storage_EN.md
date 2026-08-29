@@ -13,7 +13,7 @@
       ├── 2510.02252/
       ├── 2603.22201/
       └── ...
-/var/folders/.../T/fastembed_cache/  ← Embedding model cache (persistent)
+~/.mapce/data/models/fastembed/      ← Embedding model cache (persistent)
 /tmp/mapce_repo_<random>/         ← Code clone temp dir (auto-deleted after indexing)
 ```
 
@@ -62,10 +62,10 @@ LanceDB uses columnar compression, so actual disk usage is much smaller than raw
 
 ## 2. Embedding Model Cache (Persistent)
 
-**Location**: managed by `fastembed`, typically under the system temp directory.
+**Location**: stored in the Mapce data directory by default; override it with `MAPCE_EMBEDDING_CACHE_DIR`.
 
 ```
-/var/folders/.../T/fastembed_cache/
+~/.mapce/data/models/fastembed/
 └── models--qdrant--multilingual-e5-large-onnx/
     └── snapshots/<hash>/
         ├── model.onnx           # ONNX model weights (~2.2 GB)
@@ -73,9 +73,9 @@ LanceDB uses columnar compression, so actual disk usage is much smaller than raw
         └── config.json          # Model config
 ```
 
-**Lifecycle**: auto-downloaded on first `embed()` call, then loaded from cache. The cache typically survives reboots (macOS does not auto-clean `T/fastembed_cache/`), but may be cleaned in extreme cases. If cleaned, it will re-download on the next run.
+**Lifecycle**: auto-downloaded on first `embed()` call, then loaded from the persistent cache. If deleted, it will re-download on the next run.
 
-**Manual management**: delete `T/fastembed_cache/` to free disk space.
+**Manual management**: delete `$MAPCE_DATA_DIR/models/fastembed/` to free disk space.
 
 ---
 
@@ -192,5 +192,4 @@ compact_database()
 
 ```bash
 rm -rf ~/.mapce/data/
-rm -rf /var/folders/*/T/fastembed_cache/
 ```

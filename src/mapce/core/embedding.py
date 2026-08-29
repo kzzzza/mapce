@@ -7,26 +7,44 @@ suitable for embedding both paper text and code snippets.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Sequence
+
+from mapce.db.connection import _get_data_dir
 
 _DEFAULT_MODEL = "intfloat/multilingual-e5-large"
 
 _model = None
 _model_name: str | None = None
+_model_cache_dir: str | None = None
 
 
 def _get_model_name() -> str:
     return os.environ.get("MAPCE_EMBEDDING_MODEL", _DEFAULT_MODEL)
 
 
+def _get_model_cache_dir() -> Path:
+    """Return a persistent cache directory for FastEmbed model files."""
+    configured = os.environ.get("MAPCE_EMBEDDING_CACHE_DIR")
+    if configured:
+        return Path(configured).expanduser()
+    return _get_data_dir() / "models" / "fastembed"
+
+
 def get_model():
     """Return the global embedding model, loading it on first call."""
-    global _model, _model_name
+    global _model, _model_name, _model_cache_dir
     name = _get_model_name()
-    if _model is None or _model_name != name:
+    cache_dir = str(_get_model_cache_dir())
+    if (
+        _model is None
+        or _model_name != name
+        or _model_cache_dir != cache_dir
+    ):
         from fastembed import TextEmbedding
-        _model = TextEmbedding(model_name=name)
+        _model = TextEmbedding(model_name=name, cache_dir=cache_dir)
         _model_name = name
+        _model_cache_dir = cache_dir
     return _model
 
 

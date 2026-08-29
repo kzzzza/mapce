@@ -225,6 +225,7 @@ def search(
     year_max: int | None = None,
     venue: str | None = None,
     db: lancedb.DBConnection | None = None,
+    repo_name: str | None = None,
 ) -> tuple[list[RetrievalResult], SearchIntent]:
     """Run the full 4-stage retrieval pipeline.
 
@@ -237,6 +238,7 @@ def search(
         year_max: Optional publication year upper bound.
         venue: Optional venue filter.
         db: Optional LanceDB connection.
+        repo_name: Optional repository-name filter for code results.
 
     Returns:
         (expanded_results, intent) tuple.
@@ -246,13 +248,19 @@ def search(
 
     if intent is None:
         intent = parse_intent(query)
-        # Merge explicit filters into intent
-        if year_min:
-            intent.filters["year_min"] = year_min
-        if year_max:
-            intent.filters["year_max"] = year_max
-        if venue:
-            intent.filters["venue"] = venue
+
+    # Explicit API arguments take precedence over filters inferred by an intent
+    # parser. Convenience wrappers pass an explicit SearchIntent, so this merge
+    # must happen independently of intent construction.
+    if year_min is not None:
+        intent.filters["year_min"] = year_min
+    if year_max is not None:
+        intent.filters["year_max"] = year_max
+    if venue is not None:
+        intent.filters["venue"] = venue
+
+    if top_k_chunks <= 0:
+        return [], intent
 
     table = init_chunks(db)
 
@@ -336,7 +344,10 @@ def search(
     if intent.intent == "code_search":
         # Code queries don't benefit from the L1 (paper abstract) anchor; rank by
         # best code-chunk similarity over the whole corpus.
-        l2_results = _vsearch("chunk_type IN ('code_l2', 'code_l3')", paper_limit)
+        code_filter = "chunk_type IN ('code_l2', 'code_l3')"
+        if repo_name is not None:
+            code_filter += f" AND repo_name = {sql_str(repo_name)}"
+        l2_results = _vsearch(code_filter, paper_limit)
         paper_scores = _best_sim(l2_results)
     else:
         # (a) L1 abstract list + (b) fine L2/L3 hits, both across all papers.
@@ -350,7 +361,10 @@ def search(
         seed_l1 = l1_hits[:top_k_chunks]
         sim_rows = l1_hits + fine_hits
         if intent.intent == "hybrid":
-            code_hits = _vsearch("chunk_type IN ('code_l2', 'code_l3')", top_k_chunks)
+            code_filter = "chunk_type IN ('code_l2', 'code_l3')"
+            if repo_name is not None:
+                code_filter += f" AND repo_name = {sql_str(repo_name)}"
+            code_hits = _vsearch(code_filter, top_k_chunks)
             sim_rows = sim_rows + code_hits
             l2_results = fine_hits + code_hits + seed_l1
         else:
@@ -382,8 +396,10 @@ def search(
     capped: list[RetrievalResult] = []
     CHAR_BUDGET = 16000  # ~4000 tokens
     for r in expanded:
-        if total_chars + len(r.content) > CHAR_BUDGET:
+        if len(capped) >= top_k_chunks:
             break
+        if total_chars + len(r.content) > CHAR_BUDGET:
+            continue
         capped.append(r)
         total_chars += len(r.content)
 
@@ -565,6 +581,7 @@ def search_code(
         intent=intent,
         top_k_papers=20,
         top_k_chunks=top_k,
+        repo_name=repo_name,
     )
 
 

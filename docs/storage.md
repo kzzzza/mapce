@@ -13,7 +13,7 @@
       ├── 2510.02252/
       ├── 2603.22201/
       └── ...
-/var/folders/.../T/fastembed_cache/  ← 嵌入模型缓存（持久）
+~/.mapce/data/models/fastembed/      ← 嵌入模型缓存（持久）
 /tmp/mapce_repo_<random>/         ← 代码 clone 临时目录（索引后自动删除）
 ```
 
@@ -62,10 +62,10 @@ LanceDB 采用列式压缩存储，实际磁盘占用远小于向量原始大小
 
 ## 2. 嵌入模型缓存（持久）
 
-**位置**：由 `fastembed` 管理，通常在系统临时目录下。
+**位置**：默认保存在 Mapce 数据目录中，可通过 `MAPCE_EMBEDDING_CACHE_DIR` 覆盖。
 
 ```
-/var/folders/.../T/fastembed_cache/
+~/.mapce/data/models/fastembed/
 └── models--qdrant--multilingual-e5-large-onnx/
     └── snapshots/<hash>/
         ├── model.onnx           # ONNX 模型权重（~2.2 GB）
@@ -73,9 +73,9 @@ LanceDB 采用列式压缩存储，实际磁盘占用远小于向量原始大小
         └── config.json          # 模型配置
 ```
 
-**生命周期**：首次 `embed()` 调用时自动下载，之后从缓存加载。系统重启后缓存通常保留（macOS 不自动清理 `T/fastembed_cache/`），但极端情况下可能被系统清理。如被清理，下次运行时会自动重新下载。
+**生命周期**：首次 `embed()` 调用时自动下载，之后从持久缓存加载。删除缓存后，下次运行会自动重新下载。
 
-**手动管理**：如需释放磁盘空间，直接删除 `T/fastembed_cache/` 目录。
+**手动管理**：如需释放磁盘空间，删除 `$MAPCE_DATA_DIR/models/fastembed/` 目录。
 
 ---
 
@@ -195,5 +195,4 @@ compact_database()
 
 ```bash
 rm -rf ~/.mapce/data/
-rm -rf /var/folders/*/T/fastembed_cache/
 ```

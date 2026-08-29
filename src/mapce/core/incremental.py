@@ -221,12 +221,10 @@ def delete_paper_safe(
     paper_id: str,
     db: lancedb.DBConnection | None = None,
 ) -> dict[str, Any]:
-    """Safely delete a paper and manage cascading effects on shared code.
+    """Safely delete a paper and only the code chunks owned by that paper.
 
-    - Delete all paper chunks
+    - Delete all chunks owned by the paper
     - Delete Paper↔Code mappings
-    - Check if code chunks are shared with other papers
-    - If not shared, delete code chunks too
     - Mark index_meta as deleted
 
     Args:
@@ -242,7 +240,6 @@ def delete_paper_safe(
     from mapce.db import sql_str
     from mapce.db.operations import (
         delete_chunks_by_paper,
-        delete_chunks_by_repo_name,
         delete_mappings_by_paper,
         get_meta,
     )
@@ -252,8 +249,6 @@ def delete_paper_safe(
     meta_table = init_index_meta(db)
 
     meta = get_meta(meta_table, paper_id)
-    repo_name = meta.get("code_repo_url", "").rstrip("/").split("/")[-1].replace(".git", "") if meta else ""
-
     summary = {
         "paper_id": paper_id,
         "chunks_deleted": 0,
@@ -261,32 +256,21 @@ def delete_paper_safe(
         "mappings_deleted": 0,
     }
 
-    # Delete paper chunks
+    # Code chunks are namespaced by paper_id. Count them before deleting all
+    # owned chunks so the summary remains useful, then leave every other paper's
+    # copy untouched even when repo_name is shared.
+    try:
+        summary["code_chunks_deleted"] = chunks_table.count_rows(
+            f"paper_id = {sql_str(paper_id)} AND source_type = 'code'"
+        )
+    except Exception:
+        summary["code_chunks_deleted"] = 0
+
+    # Delete all chunks owned by this paper.
     summary["chunks_deleted"] = delete_chunks_by_paper(chunks_table, paper_id)
 
     # Delete mappings
     summary["mappings_deleted"] = delete_mappings_by_paper(mapping_table, paper_id)
-
-    # Check if code chunks are shared — if not, delete them too.
-    # NOTE: code chunks are physically stored under whichever paper_id first
-    # indexed the repo, so deletion must key on repo_name alone (not this
-    # paper_id) to remove the single physical copy. Cross-paper *retrieval* of
-    # shared code is a separate, deeper limitation (code_search filters by
-    # paper_id) and is intentionally out of scope here.
-    if repo_name:
-        # Count how many *other* papers reference this repo
-        try:
-            remaining = (
-                mapping_table.search()
-                .where(f"repo_name = {sql_str(repo_name)} AND paper_id != {sql_str(paper_id)}")
-                .to_list()
-            )
-        except Exception:
-            remaining = []
-
-        if not remaining:
-            # No other paper uses this repo — safe to delete its code chunks
-            summary["code_chunks_deleted"] = delete_chunks_by_repo_name(chunks_table, repo_name)
 
     # Mark as deleted in metadata
     if meta:

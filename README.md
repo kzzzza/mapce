@@ -45,6 +45,7 @@ uv run --env-file .env python scripts/init_db.py
 | `MINERU_API_TOKEN` | — | **必填**。MinerU API 密钥 |
 | `MAPCE_DATA_DIR` | `~/.mapce/data` | LanceDB 数据目录 |
 | `MAPCE_EMBEDDING_MODEL` | `intfloat/multilingual-e5-large` | 嵌入模型（fastembed） |
+| `MAPCE_EMBEDDING_CACHE_DIR` | `$MAPCE_DATA_DIR/models/fastembed` | 嵌入模型持久缓存目录 |
 | `MAPCE_LOG_LEVEL` | `INFO` | 日志级别 |
 | `http_proxy` / `https_proxy` | — | HTTP 代理（国内必填） |
 
@@ -115,4 +116,3 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 ## 许可
 
 [MIT](LICENSE)
-

@@ -290,11 +290,16 @@ def _render_only():
     print("已从 outputs/summary.json 重渲染 tests/REPORT.md")
 
 
-def main():
+def _exit_code(overall: dict[str, str]) -> int:
+    """Return a CI-friendly process status for the quality summary."""
+    return 1 if any(status == C.FAIL for status in overall.values()) else 0
+
+
+def main() -> int:
     import sys
     if "--render-only" in sys.argv:
         _render_only()
-        return
+        return 0
     print("######## MAPCE 索引质量测试 ########")
     dq = d.run()
     rq = r.run()
@@ -315,7 +320,8 @@ def main():
     print("\n######## 完成 ########")
     print(f"汇总: tests/outputs/summary.json")
     print(f"报告: tests/REPORT.md")
+    return _exit_code(summary["overall"])
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

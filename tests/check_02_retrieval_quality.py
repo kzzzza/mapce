@@ -41,6 +41,15 @@ def _first_sentences(text: str, n: int = 2) -> str:
     return " ".join(parts[:n]).strip()
 
 
+def _code_hit_at_k(results, gold_file: str, gold_paper_id: str, k: int) -> tuple[bool, bool]:
+    """Return file/paper known-item hits using only the first k results."""
+    top_k = results[:k]
+    return (
+        any(getattr(r, "file_path", None) == gold_file for r in top_k),
+        any(r.paper_id == gold_paper_id for r in top_k),
+    )
+
+
 def run() -> dict:
     print("\n=== check_02 检索质量 (R1–R8) ===")
     from mapce.core.retrieval import search_papers, search_code, parse_intent
@@ -152,10 +161,11 @@ def run() -> dict:
             if not q or len(q) < 3:
                 q = content[i][:120]
             results, _ = search_code(q, top_k=5)
+            file_found, paper_found = _code_hit_at_k(results, file_path[i], paper_id[i], 5)
             n += 1
-            if any(getattr(r, "file_path", None) == file_path[i] for r in results):
+            if file_found:
                 file_hit += 1
-            if any(r.paper_id == paper_id[i] for r in results):
+            if paper_found:
                 paper_hit += 1
         r4 = {
             "n": n,
@@ -172,10 +182,18 @@ def run() -> dict:
     year_cov = len(years) / max(sum(1 for ct in chunk_type if ct == "paper_l1"), 1)
     venue_vals = set(v for i, ct in enumerate(chunk_type) if ct == "paper_l1" and (v := venue[i]))
     # year filter test
-    cutoff = 2025
-    results, _ = search_papers("humanoid whole-body control", top_k=10, year_min=cutoff)
-    yr_ok = all((r.year is None) or (r.year >= cutoff) for r in results)
-    yr_violations = sum(1 for r in results if r.year is not None and r.year < cutoff)
+    cutoff = max(years) if years else 2025
+    # Query with the oldest paper's title. If year_min is accidentally ignored,
+    # this known item should surface and make the test fail deterministically.
+    oldest_l1 = min(
+        (i for i, ct in enumerate(chunk_type) if ct == "paper_l1" and year[i] is not None),
+        key=lambda i: year[i],
+        default=None,
+    )
+    filter_query = title[oldest_l1] if oldest_l1 is not None else "academic paper"
+    results, _ = search_papers(filter_query, top_k=10, year_min=cutoff)
+    yr_ok = len(results) <= 10 and all(r.year is not None and r.year >= cutoff for r in results)
+    yr_violations = sum(1 for r in results if r.year is None or r.year < cutoff)
     # venue filter (degenerate if only one venue)
     venue_testable = len(venue_vals) > 1
     r5 = {
