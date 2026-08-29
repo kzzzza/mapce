@@ -28,13 +28,20 @@ def main():
     # 1. Database tables
     print("[1/2] Initializing LanceDB tables...")
     from mapce.db.connection import get_connection
-    from mapce.db.operations import init_chunks, init_mapping, init_index_meta
+    from mapce.db.operations import (
+        ensure_index_meta_code_columns,
+        init_chunks,
+        init_code_repos,
+        init_mapping,
+        init_index_meta,
+    )
 
     db = get_connection()
     init_chunks(db)
     init_mapping(db)
-    init_index_meta(db)
-    print(f"  ✓ chunks, paper_code_mapping, index_meta ready")
+    init_code_repos(db)
+    ensure_index_meta_code_columns(init_index_meta(db))
+    print(f"  ✓ chunks, paper_code_mapping, paper_code_repos, index_meta ready")
 
     # 2. Embedding model (warm-up download)
     print("[2/2] Downloading embedding model (first-time only)...")

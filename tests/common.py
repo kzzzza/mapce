@@ -27,10 +27,18 @@ def get_db():
     return get_connection()
 
 
-def load_chunks_arrow():
-    """Load the full chunks table as a pyarrow Table (read-only)."""
+def load_chunks_arrow(columns: Sequence[str] | None = None):
+    """Load selected chunk columns as a PyArrow table (read-only).
+
+    Selecting only the columns needed by a check avoids materializing every
+    large payload column (especially embeddings and extracted table text) in
+    the same process.
+    """
     from mapce.db import init_chunks
-    return init_chunks(get_db()).to_arrow()
+    table = init_chunks(get_db())
+    if columns is not None:
+        return table.search().select(list(columns)).to_arrow()
+    return table.to_arrow()
 
 
 def load_meta() -> list[dict]:
@@ -42,6 +50,18 @@ def load_meta() -> list[dict]:
 def count_mapping_rows() -> int:
     from mapce.db.operations import init_mapping
     return init_mapping(get_db()).count_rows()
+
+
+def load_code_repos() -> list[dict]:
+    """Load repository associations without creating a missing table."""
+    db = get_db()
+    try:
+        table_names = db.list_tables().tables
+    except AttributeError:
+        table_names = db.table_names()
+    if "paper_code_repos" not in table_names:
+        return []
+    return db.open_table("paper_code_repos").search().to_list()
 
 
 def col(tbl, name: str) -> list:
@@ -143,7 +163,7 @@ def write_csv(filename: str, rows: list[dict], fieldnames: list[str] | None = No
         return path
     fieldnames = fieldnames or list(rows[0].keys())
     with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
         w.writeheader()
         for r in rows:
             w.writerow({k: r.get(k, "") for k in fieldnames})

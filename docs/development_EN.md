@@ -104,12 +104,12 @@ Stage 4: Result assembly → structured prompt injection with token budget contr
 
 ### Database
 
-Three LanceDB tables: `chunks` (main), `paper_code_mapping` (Paper↔Code links), `index_meta` (index metadata). Linked via chunk_id string references.
+Four LanceDB tables are used: `chunks` stores paper and code chunks, `paper_code_repos` stores paper-to-repository associations, `paper_code_mapping` optionally stores method-to-symbol links, and `index_meta` stores indexing metadata.
 
 ### Incremental Indexing
 
 - **Dedup**: arxiv_id exact → doi exact → title vector similarity > 0.95
-- **State machine**: pending → chunking → complete | code_pending | failed
+- **State machine**: papers use pending → chunking → complete | failed; code progress uses the independent `code_status`
 - **Deletion**: cascading check — shared code chunks preserved, exclusive ones removed
 
 ## Adding a Data Source

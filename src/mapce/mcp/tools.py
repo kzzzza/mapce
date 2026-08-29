@@ -44,6 +44,8 @@ TOOL_DEFINITIONS = [
                 "query": {"type": "string", "description": "Search query for code (function names, concepts, etc.)"},
                 "top_k": {"type": "integer", "description": "Max results (default: 10)", "default": 10},
                 "repo_name": {"type": "string", "description": "Optional: filter by repository name"},
+                "paper_id": {"type": "string", "description": "Optional: restrict search to one paper's repositories"},
+                "repo_url": {"type": "string", "description": "Optional: restrict search to one normalized GitHub repository URL"},
             },
             "required": ["query"],
         },

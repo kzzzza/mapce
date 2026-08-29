@@ -26,6 +26,8 @@ paper_id = index_paper(Path.home() / 'Downloads' / 'paper.pdf')
 
 ### Index Code
 
+After paper chunks are committed, MAPCE discovers GitHub repositories from the paper Markdown and arXiv comment. High-confidence repositories are indexed automatically, ambiguous links are recorded for review, and papers with no discovered link receive `no_code` without affecting paper retrieval. A repository supplied by the user is treated as high confidence.
+
 ```python
 import asyncio
 from mapce.mcp._handlers import index_code
@@ -46,7 +48,11 @@ for r in results:
     print(f'[{r.year}] {r.title} — {r.section_path}')
 
 # Code
-results, _ = search_code('self-attention implementation')
+results, _ = search_code(
+    'self-attention implementation',
+    paper_id='2511.04131',
+    repo_url='https://github.com/LeCAR-Lab/BFM-Zero',
+)
 
 # Hybrid (papers + code)
 intent = SearchIntent(intent='hybrid', sub_type='general')
@@ -83,6 +89,8 @@ print(asyncio.run(list_indexed_papers()))
 | `query` | string | yes | Function name, class name, concept, etc. |
 | `top_k` | int | no | Max results (default 10) |
 | `repo_name` | string | no | Filter by repository name |
+| `paper_id` | string | no | Restrict results to repositories linked to a paper |
+| `repo_url` | string | no | Restrict results to a normalized GitHub repository URL |
 
 > Find the FBModel implementation in BFM-Zero
 

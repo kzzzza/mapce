@@ -7,7 +7,8 @@
 ```
 ~/.mapce/data/                    ← LanceDB index (persistent)
   ├── chunks.lance/               # Main table
-  ├── paper_code_mapping.lance/   # Paper ↔ Code mapping
+  ├── paper_code_repos.lance/     # Paper ↔ repository associations
+  ├── paper_code_mapping.lance/   # Optional method ↔ code-symbol mapping
   ├── index_meta.lance/           # Index metadata
   └── papers/                     # MinerU output (persistent, never deleted)
       ├── 2510.02252/
@@ -33,7 +34,8 @@ All indexed data resides here after indexing. This is MAPCE's core storage.
 │   ├── data/                      # Lance columnar data files
 │   ├── _versions/                 # Versioned data (incremental write support)
 │   └── _indices/                  # Vector indices (IVF-PQ etc.)
-├── paper_code_mapping.lance/      # Paper ↔ Code mapping table
+├── paper_code_repos.lance/        # Repository associations, evidence, and status
+├── paper_code_mapping.lance/      # Optional method ↔ code-symbol mapping
 ├── index_meta.lance/              # Index metadata table
 └── _metadata.db                   # LanceDB internal metadata (SQLite)
 ```
@@ -57,6 +59,20 @@ LanceDB uses columnar compression, so actual disk usage is much smaller than raw
 - **Delete**: marked as deleted on `delete_paper`; data still occupies disk
 - **Compact**: call `compact_database()` to reclaim space from deleted data
 - **Migrate**: copy the entire `~/.mapce/data/` directory to migrate the index
+
+### Code Association Migration
+
+Preview a legacy database without modifying it:
+
+```bash
+.venv/bin/python scripts/migrate_code_associations.py
+```
+
+After reviewing the counts, apply the migration. Metadata tables are backed up first, and existing embeddings are not rebuilt:
+
+```bash
+.venv/bin/python scripts/migrate_code_associations.py --apply
+```
 
 ---
 

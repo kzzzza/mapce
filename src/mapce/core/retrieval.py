@@ -15,7 +15,7 @@ from typing import Any
 import lancedb
 
 from mapce.core.embedding import embed_single
-from mapce.db import get_connection, init_chunks, init_index_meta, sql_in_list, sql_str
+from mapce.db import get_connection, get_meta, init_chunks, init_index_meta, sql_in_list, sql_str
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +52,7 @@ class RetrievalResult:
 
     # Code-specific fields (None for paper-only results)
     repo_name: str | None = None
+    repo_url: str | None = None
     file_path: str | None = None
     language: str | None = None
     code_content: str | None = None
@@ -205,6 +206,7 @@ def _row_to_result(row: dict, score: float = 0.0) -> RetrievalResult:
         content=row.get("content", ""),
         score=score,
         repo_name=row.get("repo_name"),
+        repo_url=row.get("repo_url"),
         file_path=row.get("file_path"),
         language=row.get("language"),
         code_content=row.get("code_content"),
@@ -231,6 +233,8 @@ def search(
     venue: str | None = None,
     db: lancedb.DBConnection | None = None,
     repo_name: str | None = None,
+    paper_id: str | None = None,
+    repo_url: str | None = None,
 ) -> tuple[list[RetrievalResult], SearchIntent]:
     """Run the full 4-stage retrieval pipeline.
 
@@ -244,6 +248,8 @@ def search(
         venue: Optional venue filter.
         db: Optional LanceDB connection.
         repo_name: Optional repository-name filter for code results.
+        paper_id: Optional owning-paper filter for code results.
+        repo_url: Optional normalized repository URL filter for code results.
 
     Returns:
         (expanded_results, intent) tuple.
@@ -357,6 +363,15 @@ def search(
         code_filter = "chunk_type IN ('code_l2', 'code_l3')"
         if repo_name is not None:
             code_filter += f" AND repo_name = {sql_str(repo_name)}"
+        if paper_id is not None:
+            code_filter += f" AND paper_id = {sql_str(paper_id)}"
+        if repo_url is not None:
+            if paper_id is not None:
+                # Historical chunks may predate repo_url propagation. The MCP
+                # layer validates that this URL belongs to the paper first.
+                code_filter += f" AND (repo_url = {sql_str(repo_url)} OR repo_url IS NULL)"
+            else:
+                code_filter += f" AND repo_url = {sql_str(repo_url)}"
         l2_results = _vsearch(code_filter, paper_limit)
         paper_scores = _best_sim(l2_results)
     else:
@@ -374,6 +389,13 @@ def search(
             code_filter = "chunk_type IN ('code_l2', 'code_l3')"
             if repo_name is not None:
                 code_filter += f" AND repo_name = {sql_str(repo_name)}"
+            if paper_id is not None:
+                code_filter += f" AND paper_id = {sql_str(paper_id)}"
+            if repo_url is not None:
+                if paper_id is not None:
+                    code_filter += f" AND (repo_url = {sql_str(repo_url)} OR repo_url IS NULL)"
+                else:
+                    code_filter += f" AND repo_url = {sql_str(repo_url)}"
             code_hits = _vsearch(code_filter, top_k_chunks)
             sim_rows = sim_rows + code_hits
             l2_results = fine_hits + code_hits + seed_l1
@@ -499,13 +521,15 @@ def _expand_context(
             # Downward: fetch L3/L4 siblings from the same file
             file_path = l2_row.get("file_path", "")
             repo = l2_row.get("repo_name", "")
+            repo_url = l2_row.get("repo_url")
             if file_path and repo:
                 try:
                     siblings = (
                         table.search()
                         .where(
                             f"paper_id = {sql_str(paper_id)} AND repo_name = {sql_str(repo)} "
-                            f"AND file_path = {sql_str(file_path)} AND chunk_type IN ('code_l3', 'code_l4')"
+                            + (f"AND repo_url = {sql_str(repo_url)} " if repo_url else "")
+                            + f"AND file_path = {sql_str(file_path)} AND chunk_type IN ('code_l3', 'code_l4')"
                         )
                         .limit(15)
                         .to_list()
@@ -583,6 +607,8 @@ def search_code(
     query: str,
     top_k: int = 10,
     repo_name: str | None = None,
+    paper_id: str | None = None,
+    repo_url: str | None = None,
 ) -> tuple[list[RetrievalResult], SearchIntent]:
     """Convenience wrapper for code-only search."""
     intent = SearchIntent(intent="code_search", sub_type="general")
@@ -592,6 +618,8 @@ def search_code(
         top_k_papers=20,
         top_k_chunks=top_k,
         repo_name=repo_name,
+        paper_id=paper_id,
+        repo_url=repo_url,
     )
 
 
@@ -654,6 +682,10 @@ def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) ->
         return None
 
     l1 = l1_rows[0]
+    from mapce.core.code_repositories import get_repository_associations
+    meta = get_meta(init_index_meta(db), paper_id)
+    repositories = get_repository_associations(paper_id, db)
+
     return {
         "paper_id": paper_id,
         "title": l1.get("title", ""),
@@ -662,6 +694,11 @@ def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) ->
         "venue": l1.get("venue", ""),
         "arxiv_id": l1.get("arxiv_id"),
         "doi": l1.get("doi"),
+        "code_status": (meta or {}).get(
+            "code_status",
+            "indexed" if (meta or {}).get("code_indexed") else "not_checked",
+        ),
+        "code_repositories": repositories,
         "abstract": l1.get("content", ""),
         "sections": [
             {"heading": r.get("section_path", ""), "chunk_id": r["chunk_id"]}

@@ -192,11 +192,12 @@ def _collect_findings(dq, rq, ab):
     cmap = {c["name"].split()[0]: c for c in dq["checks"]}
     rmap = {c["name"].split()[0]: c for c in rq["checks"]}
 
-    # D8 mapping empty
+    # D8 repository association integrity
     if cmap.get("D8", {}).get("status") == "FAIL":
-        F.append({"prio": "P0", "title": "Paper↔Code 映射表为空",
-                  "evidence": f"paper_code_mapping 行数={cmap['D8']['metrics']['mapping_rows']}",
-                  "impact": "双向映射/调用链追踪功能不可用；index_code 从不写映射表"})
+        metrics = cmap["D8"]["metrics"]
+        F.append({"prio": "P0", "title": "论文—代码仓库关联损坏",
+                  "evidence": f"缺 indexed 关联={metrics.get('missing_indexed_association', 0)}，孤立={metrics.get('orphan_associations', 0)}，重复={metrics.get('duplicate_paper_repo_urls', 0)}",
+                  "impact": "按论文限定代码检索时可能漏检或串库"})
     # D7 callgraph
     d7 = cmap.get("D7", {}).get("metrics", {})
     if d7 and not d7.get("callgraph_populated"):
@@ -270,7 +271,7 @@ def _collect_findings(dq, rq, ab):
 def _recommendations():
     return [
         "**P0 改 Stage1 粗筛策略（最影响检索质量）**：当前以 L1 摘要 top-20 粗筛，导致 ~43% 深层段落在精排前丢失（R3/R4 FAIL 根因）。建议直接对 L2/L3 全库向量检索，或放大粗筛 top-N、或对 L1 用‘paper 内最相关 chunk 的最大相似度’而非摘要相似度来排序候选论文。",
-        "**P0 修复映射表**：在 `_handlers.index_code` 中实际写入 `paper_code_mapping`（或由 subagent 生成 method↔code 链接），否则双向检索特性形同虚设。",
+        "**P0 完成仓库关联迁移**：先 dry-run 核对分类，再执行 `scripts/migrate_code_associations.py --apply`，让旧论文使用独立的仓库关联状态。",
         "**P0 代码重复索引去重**：`index_code` 在插入前应按 `repo_name`/`chunk_id` 先删后插（参考 `delete_chunks_by_repo_name`），消除 1067 个重复 chunk_id。",
         "**P1 调用图谱**：code_mapper 解析 tree-sitter 后填充 `calls/called_by`，让 Stage3 调用链扩展生效。",
         "**P1 标题提取**：MinerU 解析后回退到 arXiv API/PDF 元数据补全标题，避免 title=arxivID；对历史坏数据做一次性回填。",

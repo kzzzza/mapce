@@ -13,7 +13,7 @@ import lancedb
 import pyarrow as pa
 
 from ._sql import sql_str
-from .schema import TABLE_CHUNKS, TABLE_MAPPING, TABLE_INDEX_META
+from .schema import TABLE_CHUNKS, TABLE_CODE_REPOS, TABLE_MAPPING, TABLE_INDEX_META
 
 
 def _ensure_table(db: lancedb.DBConnection, name: str, schema: pa.Schema) -> Any:
@@ -53,6 +53,25 @@ def delete_chunks_by_repo(table: Any, paper_id: str, repo_name: str) -> int:
     """Delete code chunks for a specific repo under a single owning paper."""
     before = table.count_rows()
     table.delete(f"paper_id = {sql_str(paper_id)} AND repo_name = {sql_str(repo_name)}")
+    after = table.count_rows()
+    return before - after
+
+
+def delete_chunks_by_repo_url(table: Any, paper_id: str, repo_url: str) -> int:
+    """Delete code chunks for one normalized repository association."""
+    before = table.count_rows()
+    table.delete(f"paper_id = {sql_str(paper_id)} AND repo_url = {sql_str(repo_url)}")
+    after = table.count_rows()
+    return before - after
+
+
+def delete_legacy_chunks_by_repo(table: Any, paper_id: str, repo_name: str) -> int:
+    """Delete old code chunks that predate repository URL propagation."""
+    before = table.count_rows()
+    table.delete(
+        f"paper_id = {sql_str(paper_id)} AND repo_name = {sql_str(repo_name)} "
+        "AND repo_url IS NULL"
+    )
     after = table.count_rows()
     return before - after
 
@@ -100,12 +119,83 @@ def delete_mappings_by_paper(table: Any, paper_id: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# paper_code_repos
+# ---------------------------------------------------------------------------
+
+def init_code_repos(db: lancedb.DBConnection) -> Any:
+    from .schema import CODE_REPOS_SCHEMA
+    return _ensure_table(db, TABLE_CODE_REPOS, CODE_REPOS_SCHEMA)
+
+
+def upsert_code_repo(table: Any, row: dict[str, Any]) -> None:
+    """Idempotently replace one paper/repository association."""
+    table.delete(f"association_id = {sql_str(row['association_id'])}")
+    table.add([row])
+
+
+def get_code_repo(table: Any, paper_id: str, repo_url: str) -> dict | None:
+    try:
+        rows = (
+            table.search()
+            .where(f"paper_id = {sql_str(paper_id)} AND repo_url = {sql_str(repo_url)}")
+            .limit(1)
+            .to_list()
+        )
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def list_code_repos(table: Any, paper_id: str | None = None) -> list[dict]:
+    try:
+        query = table.search()
+        if paper_id is not None:
+            query = query.where(f"paper_id = {sql_str(paper_id)}")
+        return query.to_list()
+    except Exception:
+        return []
+
+
+def delete_code_repos_by_paper(table: Any, paper_id: str) -> int:
+    before = table.count_rows()
+    table.delete(f"paper_id = {sql_str(paper_id)}")
+    after = table.count_rows()
+    return before - after
+
+
+# ---------------------------------------------------------------------------
 # index_meta
 # ---------------------------------------------------------------------------
 
 def init_index_meta(db: lancedb.DBConnection) -> Any:
     from .schema import INDEX_META_SCHEMA
     return _ensure_table(db, TABLE_INDEX_META, INDEX_META_SCHEMA)
+
+
+def ensure_index_meta_code_columns(table: Any) -> Any:
+    """Add code-state columns to a legacy index_meta table.
+
+    This function is intentionally explicit. Read-only callers and migration
+    dry-runs can open the legacy table without changing it.
+    """
+    names = set(table.schema.names)
+    if "code_status" not in names:
+        table.add_columns({"code_status": "'not_checked'"})
+        # Preserve legacy meaning immediately. This explicit schema upgrade may
+        # be triggered before the formal migration is applied.
+        table.update(where="code_indexed = true", values={"code_status": "indexed"})
+        table.update(
+            where="has_code = true AND code_indexed = false",
+            values={"code_status": "pending"},
+        )
+        table.update(
+            where="status = 'code_pending' AND code_indexed = false",
+            values={"code_status": "pending"},
+        )
+    names = set(table.schema.names)
+    if "code_checked_at" not in names:
+        table.add_columns({"code_checked_at": "CAST(NULL AS STRING)"})
+    return table
 
 
 def upsert_meta(table: Any, row: dict[str, Any]) -> None:

@@ -1,6 +1,6 @@
 """check_01 — MAPCE 索引数据质量静态检查 (D1–D8).
 
-只读分析 chunks / index_meta / paper_code_mapping 三张表，不加载嵌入模型。
+只读分析 chunks / index_meta / paper_code_repos / paper_code_mapping，不加载嵌入模型。
 每项给出 PASS/WARN/FAIL 判定，问题明细写到 outputs/*.csv。
 
 运行: uv run --env-file .env python tests/check_01_data_quality.py
@@ -29,7 +29,12 @@ def _is_bad_title(title: str, paper_id: str, arxiv_id: str | None) -> bool:
 
 def run() -> dict:
     print("\n=== check_01 数据质量 (D1–D8) ===")
-    tbl = C.load_chunks_arrow()
+    tbl = C.load_chunks_arrow([
+        "chunk_type", "source_type", "paper_id", "content", "chunk_id",
+        "embedding", "title", "year", "venue", "authors", "arxiv_id",
+        "symbol_name", "signature", "calls", "called_by",
+        "associated_test", "figure_path",
+    ])
     meta = C.load_meta()
     n_papers = len(meta)
     n_chunks = tbl.num_rows
@@ -39,7 +44,10 @@ def run() -> dict:
     paper_id = C.col(tbl, "paper_id")
     content = C.col(tbl, "content")
     chunk_id = C.col(tbl, "chunk_id")
-    embedding = C.col(tbl, "embedding")
+    # Keep embeddings in Arrow's compact float32 buffers. Converting the whole
+    # 88k x 1024 column with ``to_pylist`` creates tens of millions of Python
+    # float objects and can multiply memory usage by an order of magnitude.
+    embedding = tbl.column("embedding")
     title = C.col(tbl, "title")
     year = C.col(tbl, "year")
     venue = C.col(tbl, "venue")
@@ -87,18 +95,26 @@ def run() -> dict:
 
     # ---- D2 状态一致性 ----
     status_counts = dict(collections.Counter(m["status"] for m in meta))
+    code_status_counts = dict(collections.Counter(
+        m.get("code_status") or (
+            "indexed" if m.get("code_indexed") else
+            "pending" if m.get("status") == "code_pending" else "not_checked"
+        )
+        for m in meta
+    ))
     code_pending = [m for m in meta if m["status"] == "code_pending"]
     cp_rate = len(code_pending) / max(n_papers, 1)
-    # has_code true but code_indexed false, or code_pending with has_code true mismatch
+    # Legacy aggregate fields must agree with the new code state.
     inconsistent = [
         m for m in meta
-        if (m.get("has_code") and not m.get("code_indexed"))
-        or (m["status"] == "complete" and m.get("has_code") and not m.get("code_indexed"))
+        if (m.get("code_status") == "indexed") != bool(m.get("code_indexed"))
+        or (m.get("code_status") == "no_code" and bool(m.get("has_code")))
     ]
     d2_status = C.grade(cp_rate, 0.05, 0.20, higher_is_better=False)
     checks.append(C.check(
         "D2 状态一致性", {
             "status_distribution": status_counts,
+            "code_status_distribution": code_status_counts,
             "code_pending_count": len(code_pending),
             "code_pending_rate": round(cp_rate, 4),
             "has_code_indexed_inconsistent": len(inconsistent),
@@ -163,30 +179,32 @@ def run() -> dict:
     C.write_csv("duplicate_chunk_ids.csv", [{"chunk_id": x} for x in dup_ids[:500]], ["chunk_id"])
 
     # ---- D5 嵌入健康 ----
-    null_emb = sum(1 for e in embedding if e is None)
+    null_emb = embedding.null_count
     emb_cov = 1 - null_emb / max(n_chunks, 1)
-    # dimension + zero/NaN sanity on a sample (full scan of dims is cheap via len)
+    # Dimension + zero/NaN sanity over the full column, one Arrow chunk at a
+    # time. NumPy views/copies are released per chunk instead of retaining a
+    # Python list for every individual vector element.
     bad_dim = 0
     zero_vec = 0
     nan_vec = 0
-    import math
-    for e in embedding:
-        if e is None:
+    import numpy as np
+    for arrow_chunk in embedding.chunks:
+        list_size = getattr(arrow_chunk.type, "list_size", None)
+        if list_size != 1024:
+            bad_dim += len(arrow_chunk) - arrow_chunk.null_count
             continue
-        if len(e) != 1024:
-            bad_dim += 1
+        valid = np.asarray(
+            arrow_chunk.is_valid().to_numpy(zero_copy_only=False), dtype=bool
+        )
+        values = arrow_chunk.values.to_numpy(zero_copy_only=False).reshape(
+            len(arrow_chunk), list_size
+        )
+        valid_values = values[valid]
+        if not len(valid_values):
             continue
-        s = 0.0
-        has_nan = False
-        for x in e:
-            if math.isnan(x) or math.isinf(x):
-                has_nan = True
-                break
-            s += abs(x)
-        if has_nan:
-            nan_vec += 1
-        elif s == 0.0:
-            zero_vec += 1
+        finite = np.isfinite(valid_values).all(axis=1)
+        nan_vec += int((~finite).sum())
+        zero_vec += int((np.abs(valid_values[finite]).sum(axis=1) == 0).sum())
     d5_status = C.PASS
     if emb_cov < 0.99 or bad_dim or zero_vec or nan_vec:
         d5_status = C.FAIL if (bad_dim or zero_vec or nan_vec) else C.WARN
@@ -262,18 +280,55 @@ def run() -> dict:
         f"call-graph 边数 {total_refs}; symbol 缺失率 {sym_missing_rate:.0%}",
     ))
 
-    # ---- D8 映射表 ----
+    # ---- D8 仓库关联完整性（方法—符号映射为可选指标） ----
+    repo_rows = C.load_code_repos()
     mapping_rows = C.count_mapping_rows()
     papers_has_code = [m for m in meta if m.get("code_indexed")]
-    d8_status = C.FAIL if mapping_rows == 0 else C.grade(
-        mapping_rows / max(len(papers_has_code), 1), 1.0, 0.5
+    known_papers = {m["paper_id"] for m in meta}
+    orphan_associations = [row for row in repo_rows if row.get("paper_id") not in known_papers]
+    duplicate_association_ids = [
+        key for key, count in collections.Counter(row.get("association_id") for row in repo_rows).items()
+        if key and count > 1
+    ]
+    duplicate_paper_urls = [
+        key for key, count in collections.Counter(
+            (row.get("paper_id"), row.get("repo_url")) for row in repo_rows
+        ).items() if count > 1
+    ]
+    papers_with_multiple_primary = [
+        paper for paper, count in collections.Counter(
+            row.get("paper_id") for row in repo_rows if row.get("is_primary")
+        ).items() if paper and count > 1
+    ]
+    associated_papers = {row.get("paper_id") for row in repo_rows if row.get("paper_id")}
+    primary_papers = {row.get("paper_id") for row in repo_rows if row.get("is_primary")}
+    papers_missing_primary = sorted(associated_papers - primary_papers)
+    indexed_association_papers = {
+        row.get("paper_id") for row in repo_rows if row.get("status") == "indexed"
+    }
+    missing_indexed_association = [
+        m["paper_id"] for m in papers_has_code if m["paper_id"] not in indexed_association_papers
+    ]
+    hard_errors = (
+        len(orphan_associations) + len(duplicate_association_ids)
+        + len(duplicate_paper_urls) + len(papers_with_multiple_primary)
+        + len(papers_missing_primary) + len(missing_indexed_association)
     )
+    d8_status = C.FAIL if hard_errors else C.PASS
     checks.append(C.check(
-        "D8 Paper↔Code 映射表", {
-            "mapping_rows": mapping_rows,
+        "D8 论文—代码仓库关联", {
+            "repository_association_rows": len(repo_rows),
             "papers_with_code_indexed": len(papers_has_code),
+            "missing_indexed_association": len(missing_indexed_association),
+            "orphan_associations": len(orphan_associations),
+            "duplicate_association_ids": len(duplicate_association_ids),
+            "duplicate_paper_repo_urls": len(duplicate_paper_urls),
+            "papers_with_multiple_primary": len(papers_with_multiple_primary),
+            "papers_missing_primary": len(papers_missing_primary),
+            "method_symbol_mapping_rows_optional": mapping_rows,
         }, d8_status,
-        f"paper_code_mapping 行数 = {mapping_rows} (期望随 {len(papers_has_code)} 篇带代码论文填充)",
+        f"仓库关联 {len(repo_rows)} 行；缺失 indexed 关联 {len(missing_indexed_association)} 篇；"
+        f"方法—符号映射 {mapping_rows} 行（可选）",
     ))
 
     overall = C.worst([c["status"] for c in checks])

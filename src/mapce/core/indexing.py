@@ -6,11 +6,8 @@ into a single end-to-end pipeline for indexing a paper.
 
 from __future__ import annotations
 
-import json
 import re
 import shutil
-import subprocess
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -18,6 +15,7 @@ from typing import Any, Callable
 from mapce.core.chunking.paper import chunk_paper
 from mapce.core.embedding import embed, embed_single
 from mapce.db import (
+    ensure_index_meta_code_columns,
     get_connection,
     init_chunks,
     init_index_meta,
@@ -89,6 +87,29 @@ def _extract_metadata_from_mineru(paper_dir: Path, pdf_path: Path) -> dict[str, 
     }
 
 
+def _enrich_metadata_from_arxiv(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Best-effort enrichment, including the arXiv comment used for discovery."""
+    arxiv_id = metadata.get("arxiv_id")
+    if not arxiv_id or metadata.get("arxiv_comment"):
+        return metadata
+    try:
+        from mapce.sources.arxiv import get_arxiv_metadata
+        arxiv_meta = get_arxiv_metadata(str(arxiv_id))
+    except Exception:
+        return metadata
+    if arxiv_meta is None:
+        return metadata
+    enriched = dict(metadata)
+    if not enriched.get("title") or enriched.get("title") == arxiv_id:
+        enriched["title"] = arxiv_meta.title or enriched.get("title")
+    if not enriched.get("authors"):
+        enriched["authors"] = arxiv_meta.authors
+    if not enriched.get("year") and arxiv_meta.published:
+        enriched["year"] = int(arxiv_meta.published[:4])
+    enriched["arxiv_comment"] = arxiv_meta.comment
+    return enriched
+
+
 def index_paper(
     pdf_path: Path,
     output_dir: Path | None = None,
@@ -142,6 +163,7 @@ def index_paper(
 
     if metadata is None:
         metadata = _extract_metadata_from_mineru(paper_dir, pdf_path)
+    metadata = _enrich_metadata_from_arxiv(metadata)
 
     paper_id = _index_from_mineru_dir(paper_dir, metadata, on_progress=on_progress)
 
@@ -171,6 +193,7 @@ def _index_from_mineru_dir(
     db = get_connection()
     chunks_table = init_chunks(db)
     meta_table = init_index_meta(db)
+    ensure_index_meta_code_columns(meta_table)
 
     if on_progress:
         on_progress("chunking", {"status": "chunking"})
@@ -214,27 +237,73 @@ def _index_from_mineru_dir(
         "has_code": False,
         "code_repo_url": None,
         "code_indexed": False,
-        "status": "code_pending" if _detect_github_url(paper_dir) else "complete",
+        "code_status": "not_checked",
+        "code_checked_at": None,
+        "status": "complete",
         "error_msg": None,
     })
+
+    # Repository discovery runs only after paper chunks and metadata have been
+    # committed. Code failures therefore cannot roll back a readable paper.
+    from mapce.core.code_indexing import CodeIndexingError, index_code_repository
+    from mapce.core.code_repositories import (
+        discover_code_repositories,
+        save_discovered_repositories,
+    )
+    from mapce.mineru.parser import MinerUOutput
+
+    markdown_available = True
+    try:
+        markdown = MinerUOutput(paper_dir).read_markdown()
+    except Exception:
+        markdown_available = False
+        markdown = ""
+    candidates = discover_code_repositories(
+        markdown,
+        title,
+        str(metadata.get("arxiv_comment") or ""),
+    )
+    if markdown_available or candidates:
+        save_discovered_repositories(paper_id, candidates, db=db)
+
+    if on_progress:
+        on_progress("code_discovery", {
+            "paper_id": paper_id,
+            "repositories": candidates,
+        })
+
+    for candidate in candidates:
+        if candidate["confidence"] != "high":
+            continue
+        if on_progress:
+            on_progress("code_indexing", {
+                "paper_id": paper_id,
+                "repo_url": candidate["repo_url"],
+                "status": "indexing",
+            })
+        try:
+            index_code_repository(
+                candidate["repo_url"],
+                paper_id,
+                source=candidate["source"],
+                confidence=candidate["confidence"],
+                score=candidate["score"],
+                evidence=candidate.get("evidence"),
+                db=db,
+            )
+        except CodeIndexingError as exc:
+            if on_progress:
+                on_progress("code_indexing", {
+                    "paper_id": paper_id,
+                    "repo_url": candidate["repo_url"],
+                    "status": "failed",
+                    "error": str(exc),
+                })
 
     if on_progress:
         on_progress("done", {"paper_id": paper_id, "chunk_count": len(chunks)})
 
     return paper_id
-
-
-def _detect_github_url(paper_dir: Path) -> bool:
-    """Check if the paper mentions a GitHub URL in its markdown."""
-    import re
-    from mapce.mineru.parser import MinerUOutput
-
-    try:
-        mineru = MinerUOutput(paper_dir)
-        md = mineru.read_markdown()
-        return bool(re.search(r"github\.com/[\w.-]+/[\w.-]+", md))
-    except Exception:
-        return False
 
 
 def _update_paper_paths(paper_id: str, old_dir: Path, new_dir: Path) -> None:
@@ -329,7 +398,7 @@ def index_paper_from_arxiv(
         cache_parent,
     )
 
-    # Extract metadata from arxiv (basic). Only new-style ids (YYMM.NNNNN)
+    # Extract metadata from arXiv. Only new-style ids (YYMM.NNNNN)
     # encode the year; old-style ids (e.g. "hep-th/9901001") don't, so leave
     # year=None there and let the MinerU-derived metadata fill it in later.
     _ym = re.match(r"(\d{2})(\d{2})\.", arxiv_id)
@@ -341,13 +410,15 @@ def index_paper_from_arxiv(
         "arxiv_id": arxiv_id,
         "doi": None,
         "keywords": [],
+        "arxiv_comment": "",
     }
+    metadata = _enrich_metadata_from_arxiv(metadata)
     # Try to get a better title from the markdown
     try:
         mineru = MinerUOutput(paper_dir)
         md = mineru.read_markdown()
         lines = md.strip().split("\n")
-        if lines and lines[0].startswith("#"):
+        if metadata["title"] == arxiv_id and lines and lines[0].startswith("#"):
             metadata["title"] = lines[0].lstrip("#").strip()
     except Exception:
         pass

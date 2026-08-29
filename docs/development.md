@@ -104,12 +104,12 @@ PDF/arXiv → MinerU 解析 → chunking → embedding → LanceDB
 
 ### 数据库
 
-LanceDB 三表：`chunks`（主表）、`paper_code_mapping`（Paper↔Code 映射）、`index_meta`（索引元信息）。关联靠 chunk_id 字符串引用。
+LanceDB 有四张表：`chunks` 存放论文和代码分块，`paper_code_repos` 存放论文—仓库关联，`paper_code_mapping` 可选存放论文方法—代码符号映射，`index_meta` 存放索引元信息。
 
 ### 增量索引
 
 - **去重**：arxiv_id 精确 → doi 精确 → title 向量相似度 > 0.95
-- **状态机**：pending → chunking → complete | code_pending | failed
+- **状态机**：论文使用 pending → chunking → complete | failed；代码进度独立使用 `code_status`
 - **删除**：级联检查，共享代码块保留、独有代码块删除
 
 ## 添加新的数据源

@@ -1,8 +1,9 @@
 """LanceDB table schemas.
 
-Three tables:
+Four tables:
   - chunks: unified storage for all chunk types (paper, code, special)
-  - paper_code_mapping: Paper <-> Code bidirectional links
+  - paper_code_mapping: optional paper-method <-> code-symbol links
+  - paper_code_repos: Paper <-> repository associations
   - index_meta: indexing metadata for incremental update support
 """
 
@@ -64,7 +65,7 @@ CHUNKS_SCHEMA = pa.schema([
 ])
 
 # ---------------------------------------------------------------------------
-# paper_code_mapping — Paper <-> Code links
+# paper_code_mapping — optional paper-method <-> code-symbol links
 # ---------------------------------------------------------------------------
 
 MAPPING_SCHEMA = pa.schema([
@@ -77,6 +78,30 @@ MAPPING_SCHEMA = pa.schema([
     pa.field("evidence", pa.string(), nullable=True),
     pa.field("created_by", pa.string(), nullable=False),   # subagent | manual | heuristic
     pa.field("verified", pa.bool_(), nullable=False),
+])
+
+# ---------------------------------------------------------------------------
+# paper_code_repos — paper <-> repository associations
+# ---------------------------------------------------------------------------
+
+CODE_REPOS_SCHEMA = pa.schema([
+    pa.field("association_id", pa.string(), nullable=False),
+    pa.field("paper_id", pa.string(), nullable=False),
+    pa.field("repo_url", pa.string(), nullable=False),
+    pa.field("repo_name", pa.string(), nullable=False),
+    pa.field("source", pa.string(), nullable=False),
+    # paper | arxiv_metadata | user | legacy
+    pa.field("confidence", pa.string(), nullable=False),
+    # high | medium | low
+    pa.field("score", pa.int32(), nullable=False),
+    pa.field("evidence", pa.string(), nullable=True),
+    pa.field("is_primary", pa.bool_(), nullable=False),
+    pa.field("status", pa.string(), nullable=False),
+    # candidate | pending | indexing | indexed | failed
+    pa.field("discovered_at", pa.string(), nullable=False),
+    pa.field("indexed_at", pa.string(), nullable=True),
+    pa.field("updated_at", pa.string(), nullable=False),
+    pa.field("error_msg", pa.string(), nullable=True),
 ])
 
 # ---------------------------------------------------------------------------
@@ -95,8 +120,11 @@ INDEX_META_SCHEMA = pa.schema([
     pa.field("has_code", pa.bool_(), nullable=False),
     pa.field("code_repo_url", pa.string(), nullable=True),
     pa.field("code_indexed", pa.bool_(), nullable=False),
+    pa.field("code_status", pa.string(), nullable=False),
+    # not_checked | no_code | needs_review | pending | indexing | indexed | failed
+    pa.field("code_checked_at", pa.string(), nullable=True),
     pa.field("status", pa.string(), nullable=False),
-    # complete | code_pending | chunking | pending | failed | deleted
+    # complete | chunking | pending | failed | deleted (code_pending is legacy-only)
     pa.field("error_msg", pa.string(), nullable=True),
 ])
 
@@ -106,4 +134,5 @@ INDEX_META_SCHEMA = pa.schema([
 
 TABLE_CHUNKS = "chunks"
 TABLE_MAPPING = "paper_code_mapping"
+TABLE_CODE_REPOS = "paper_code_repos"
 TABLE_INDEX_META = "index_meta"

@@ -7,7 +7,8 @@
 ```
 ~/.mapce/data/                    ← LanceDB 索引库（持久）
   ├── chunks.lance/               # 主表
-  ├── paper_code_mapping.lance/   # Paper ↔ Code 映射
+  ├── paper_code_repos.lance/     # 论文 ↔ 代码仓库关联
+  ├── paper_code_mapping.lance/   # 论文方法 ↔ 代码符号映射（可选）
   ├── index_meta.lance/           # 索引元信息
   └── papers/                     # MinerU 解析结果（持久，不删除）
       ├── 2510.02252/
@@ -34,6 +35,7 @@
 │   ├── _versions/                 # 版本化数据（支持增量写入）
 │   └── _indices/                  # 向量索引（IVF-PQ 等）
 ├── paper_code_mapping.lance/      # Paper ↔ Code 映射表
+├── paper_code_repos.lance/        # 论文 ↔ 仓库关联、证据和索引状态
 ├── index_meta.lance/              # 索引元信息表
 └── _metadata.db                   # LanceDB 内部元数据（SQLite）
 ```
@@ -57,6 +59,20 @@ LanceDB 采用列式压缩存储，实际磁盘占用远小于向量原始大小
 - **删除**：`delete_paper` 时标记删除，数据仍占磁盘
 - **回收**：调用 `compact_database()` 释放已删除数据的空间
 - **迁移**：复制整个 `~/.mapce/data/` 目录即可迁移索引库
+
+### 代码仓库状态迁移
+
+旧数据库先执行只读预览：
+
+```bash
+.venv/bin/python scripts/migrate_code_associations.py
+```
+
+核对分类数量后再写入。写入前会备份元数据表，不会重新生成论文或历史代码向量：
+
+```bash
+.venv/bin/python scripts/migrate_code_associations.py --apply
+```
 
 ---
 

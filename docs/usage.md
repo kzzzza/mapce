@@ -26,6 +26,8 @@ paper_id = index_paper(Path.home() / 'Downloads' / 'paper.pdf')
 
 ### 索引代码
 
+新论文完成正文索引后，会从 Markdown 正文和 arXiv comment 中识别 GitHub 仓库。高可信仓库自动索引；歧义链接仅记录为候选；未发现仓库时标记为 `no_code`，论文内容仍可正常检索。用户明确提供的仓库按高可信来源处理。
+
 ```python
 import asyncio
 from mapce.mcp._handlers import index_code
@@ -46,7 +48,11 @@ for r in results:
     print(f'[{r.year}] {r.title} — {r.section_path}')
 
 # 代码
-results, _ = search_code('self-attention implementation')
+results, _ = search_code(
+    'self-attention implementation',
+    paper_id='2511.04131',
+    repo_url='https://github.com/LeCAR-Lab/BFM-Zero',
+)
 
 # 混合检索
 intent = SearchIntent(intent='hybrid', sub_type='general')
@@ -83,6 +89,8 @@ print(asyncio.run(list_indexed_papers()))
 | `query` | string | 是 | 函数名、类名、功能描述等 |
 | `top_k` | int | 否 | 最大结果数（默认 10） |
 | `repo_name` | string | 否 | 限定仓库名 |
+| `paper_id` | string | 否 | 限定为某篇论文关联的代码 |
+| `repo_url` | string | 否 | 限定规范化的 GitHub 仓库 URL |
 
 > 找一下 BFM-Zero 里的 FBModel 实现
 

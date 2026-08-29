@@ -116,7 +116,7 @@ def transition_state(
 
     Valid transitions (any → next):
       pending → chunking → complete
-      pending → chunking → code_pending → complete
+      code_pending → complete (legacy migration only)
       any → failed
       any → deleted
 
@@ -167,7 +167,9 @@ def get_papers_needing_code(db: lancedb.DBConnection | None = None) -> list[dict
     all_papers = list_all_meta(meta_table)
     return [
         p for p in all_papers
-        if p.get("status") == "code_pending" or (p.get("has_code") and not p.get("code_indexed"))
+        if p.get("code_status") in {"pending", "indexing", "failed", "needs_review"}
+        or p.get("status") == "code_pending"
+        or (p.get("has_code") and not p.get("code_indexed"))
     ]
 
 
@@ -204,10 +206,27 @@ def reindex_paper(
     delete_chunks_by_paper(db.open_table("chunks"), paper_id)
     delete_mappings_by_paper(db.open_table("paper_code_mapping"), paper_id)
 
+    # Re-indexing removes owned code chunks too, so repository rows must stop
+    # claiming that searchable code still exists.
+    try:
+        from mapce.core.code_repositories import utc_now
+        from mapce.db.operations import list_code_repos, upsert_code_repo
+        repo_table = db.open_table("paper_code_repos")
+        for row in list_code_repos(repo_table, paper_id):
+            row["status"] = "pending" if row.get("confidence") == "high" else "candidate"
+            row["indexed_at"] = None
+            row["updated_at"] = utc_now()
+            row["error_msg"] = None
+            upsert_code_repo(repo_table, row)
+    except Exception:
+        pass
+
     # Update meta to pending so the re-index can set it to complete
     meta["status"] = "pending"
     meta["chunk_count"] = 0
     meta["code_indexed"] = False
+    if "code_status" in meta:
+        meta["code_status"] = "pending" if meta.get("has_code") else "not_checked"
     upsert_meta(meta_table, meta)
 
     return True
@@ -239,6 +258,7 @@ def delete_paper_safe(
 
     from mapce.db import sql_str
     from mapce.db.operations import (
+        delete_code_repos_by_paper,
         delete_chunks_by_paper,
         delete_mappings_by_paper,
         get_meta,
@@ -254,6 +274,7 @@ def delete_paper_safe(
         "chunks_deleted": 0,
         "code_chunks_deleted": 0,
         "mappings_deleted": 0,
+        "repository_associations_deleted": 0,
     }
 
     # Code chunks are namespaced by paper_id. Count them before deleting all
@@ -271,6 +292,12 @@ def delete_paper_safe(
 
     # Delete mappings
     summary["mappings_deleted"] = delete_mappings_by_paper(mapping_table, paper_id)
+
+    try:
+        repo_table = db.open_table("paper_code_repos")
+        summary["repository_associations_deleted"] = delete_code_repos_by_paper(repo_table, paper_id)
+    except Exception:
+        pass
 
     # Mark as deleted in metadata
     if meta:
@@ -292,7 +319,7 @@ def compact_database(db: lancedb.DBConnection | None = None) -> None:
     if db is None:
         db = get_connection()
 
-    for table_name in ["chunks", "paper_code_mapping", "index_meta"]:
+    for table_name in ["chunks", "paper_code_mapping", "paper_code_repos", "index_meta"]:
         try:
             table = db.open_table(table_name)
             table.compact_files()

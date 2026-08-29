@@ -8,9 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
-import subprocess
-import tempfile
 from pathlib import Path
 
 logger = logging.getLogger("mapce.mcp")
@@ -90,13 +87,82 @@ async def search_code(
     query: str,
     top_k: int = 10,
     repo_name: str | None = None,
+    paper_id: str | None = None,
+    repo_url: str | None = None,
 ) -> str:
     """Search indexed code chunks."""
+    from mapce.core.code_repositories import (
+        get_repository_associations,
+        normalize_github_url,
+    )
     from mapce.core.retrieval import VectorSearchError
     from mapce.core.retrieval import search_code as _search_code
+    from mapce.db import get_connection, get_meta, init_index_meta
+
+    normalized_repo_url = None
+    if repo_url is not None:
+        normalized_repo_url = normalize_github_url(repo_url)
+        if normalized_repo_url is None:
+            return json.dumps({
+                "status": "error",
+                "error_code": "invalid_repository_url",
+                "count": 0,
+                "results": [],
+                "message": "repo_url must be a GitHub owner/repo URL.",
+            })
+
+    if paper_id is not None:
+        db = get_connection()
+        meta = get_meta(init_index_meta(db), paper_id)
+        if meta is None or meta.get("status") == "deleted":
+            return json.dumps({
+                "status": "error", "error_code": "paper_not_found",
+                "count": 0, "results": [], "message": f"Paper not found: {paper_id}",
+            })
+        repositories = get_repository_associations(paper_id, db)
+        if not repositories and meta.get("code_indexed") and meta.get("code_repo_url"):
+            legacy_url = normalize_github_url(meta["code_repo_url"])
+            if legacy_url is not None:
+                repositories = [{
+                    "paper_id": paper_id,
+                    "repo_url": legacy_url,
+                    "repo_name": legacy_url.rsplit("/", 1)[-1],
+                    "source": "legacy",
+                    "confidence": "high",
+                    "is_primary": True,
+                    "status": "indexed",
+                    "evidence": "Legacy index_meta compatibility view",
+                }]
+        code_status = meta.get("code_status") or (
+            "indexed" if meta.get("code_indexed") else
+            "pending" if meta.get("status") == "code_pending" else "not_checked"
+        )
+        if code_status == "no_code":
+            return json.dumps({
+                "status": "error", "error_code": "no_code_repository",
+                "code_status": code_status, "count": 0, "results": [],
+                "repositories": repositories,
+                "message": "No repository was found in the paper or arXiv metadata.",
+            }, ensure_ascii=False)
+        matching = repositories
+        if normalized_repo_url is not None:
+            matching = [row for row in repositories if row.get("repo_url") == normalized_repo_url]
+        if code_status != "indexed" or not any(row.get("status") == "indexed" for row in matching):
+            return json.dumps({
+                "status": "error", "error_code": "code_not_indexed",
+                "code_status": code_status, "count": 0, "results": [],
+                "repositories": repositories,
+                "message": "The paper's code repository is not indexed yet.",
+            }, ensure_ascii=False)
 
     try:
-        results, intent = _search_code(query=query, top_k=top_k, repo_name=repo_name)
+        results, intent = _search_code(
+            query=query,
+            top_k=top_k,
+            repo_name=repo_name,
+            paper_id=paper_id,
+            repo_url=normalized_repo_url,
+        )
     except VectorSearchError:
         logger.exception("Code vector search failed")
         return _vector_search_error_response()
@@ -116,6 +182,7 @@ async def search_code(
                 "chunk_id": r.chunk_id,
                 "paper_id": r.paper_id,
                 "repo_name": r.repo_name,
+                "repo_url": r.repo_url,
                 "file_path": r.file_path,
                 "language": r.language,
                 "symbol_name": getattr(r, 'symbol_name', None),
@@ -139,6 +206,8 @@ async def index_paper(
     """Index a paper from a local PDF path, arXiv ID, or URL."""
     from mapce.core.indexing import index_paper as _index_paper
     from mapce.core.indexing import index_paper_from_arxiv
+    from mapce.core.code_repositories import get_repository_associations
+    from mapce.db import get_connection, get_meta, init_index_meta
 
     if source_type == "arxiv":
         paper_id = index_paper_from_arxiv(arxiv_id=source, language=language)
@@ -150,11 +219,16 @@ async def index_paper(
     else:
         return json.dumps({"status": "error", "message": f"Unknown source_type: {source_type}"})
 
+    db = get_connection()
+    meta = get_meta(init_index_meta(db), paper_id) or {}
+    repositories = get_repository_associations(paper_id, db)
     return json.dumps({
         "status": "ok",
         "paper_id": paper_id,
+        "code_status": meta.get("code_status", "not_checked"),
+        "code_repositories": repositories,
         "message": f"Paper indexed: {paper_id}",
-    })
+    }, ensure_ascii=False)
 
 
 # ---------------------------------------------------------------------------
@@ -165,73 +239,26 @@ async def index_code(
     repo_url: str,
     paper_id: str,
 ) -> str:
-    """Clone and index a code repository, linking it to a paper."""
-    from mapce.core.chunking.code import chunk_repo
-    from mapce.core.embedding import embed
-    from mapce.db import get_connection, init_chunks, init_mapping, init_index_meta
-    from mapce.db.operations import (
-        delete_chunks_by_repo,
-        get_meta,
-        insert_chunks,
-        upsert_meta,
+    """Index a user-provided repository after validating the paper."""
+    from mapce.core.code_indexing import (
+        CodeIndexingError,
+        InvalidRepositoryURLError,
+        PaperNotFoundError,
+        index_code_repository,
     )
-
-    tmp_dir = Path(tempfile.mkdtemp(prefix="mapce_repo_"))
-    repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
-    repo_path = tmp_dir / repo_name
-
     try:
-        result = subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, str(repo_path)],
-            capture_output=True, text=True, timeout=300,
-        )
-        if result.returncode != 0:
-            return json.dumps({
-                "status": "error",
-                "message": f"Failed to clone: {result.stderr[-500:]}",
-            })
-
-        chunks = chunk_repo(paper_id, repo_url, repo_path)
-        contents = [c["content"] for c in chunks]
-        embeddings = embed(contents)
-        for c, emb in zip(chunks, embeddings):
-            c["embedding"] = emb
-            c["fulltext_search"] = c["content"]
-
-        db = get_connection()
-        chunks_table = init_chunks(db)
-        meta_table = init_index_meta(db)
-
-        # Make re-indexing idempotent without touching another paper that happens
-        # to reference the same repository (or an unrelated repository with the
-        # same basename). Code chunk IDs include paper_id, so the replacement
-        # scope must match that ownership boundary.
-        removed = delete_chunks_by_repo(chunks_table, paper_id, repo_name)
-
-        insert_chunks(chunks_table, chunks)
-
-        meta = get_meta(meta_table, paper_id)
-        if meta:
-            meta["has_code"] = True
-            meta["code_repo_url"] = repo_url
-            meta["code_indexed"] = True
-            meta["status"] = "complete"
-            upsert_meta(meta_table, meta)
-
+        result = index_code_repository(repo_url, paper_id, source="user", confidence="high", score=9)
         return json.dumps({
             "status": "ok",
-            "paper_id": paper_id,
-            "repo_name": repo_name,
-            "chunk_count": len(chunks),
-            "replaced_chunks": removed,
-            "message": f"Indexed {len(chunks)} chunks from {repo_name}"
-                       + (f" (replaced {removed} existing)." if removed else "."),
-        })
-
-    except Exception as e:
-        return json.dumps({"status": "error", "message": str(e)})
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+            **result,
+            "message": f"Indexed {result['chunk_count']} chunks from {result['repo_name']}.",
+        }, ensure_ascii=False)
+    except PaperNotFoundError as exc:
+        return json.dumps({"status": "error", "error_code": "paper_not_found", "message": str(exc)})
+    except InvalidRepositoryURLError as exc:
+        return json.dumps({"status": "error", "error_code": "invalid_repository_url", "message": str(exc)})
+    except CodeIndexingError as exc:
+        return json.dumps({"status": "error", "error_code": "code_index_failed", "message": str(exc)})
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +288,10 @@ async def list_indexed_papers() -> str:
                 "chunk_count": p["chunk_count"],
                 "has_code": p["has_code"],
                 "code_indexed": p["code_indexed"],
+                "code_status": p.get(
+                    "code_status",
+                    "indexed" if p.get("code_indexed") else "not_checked",
+                ),
                 "status": p["status"],
             }
             for p in papers
@@ -315,10 +346,17 @@ async def get_stats() -> str:
     papers = list_all_meta(meta_table)
     total_chunks = chunks_table.count_rows() if chunks_table else 0
     papers_with_code = sum(1 for p in papers if p.get("code_indexed"))
+    code_status_counts: dict[str, int] = {}
+    for paper in papers:
+        status = paper.get("code_status") or (
+            "indexed" if paper.get("code_indexed") else "not_checked"
+        )
+        code_status_counts[status] = code_status_counts.get(status, 0) + 1
 
     return json.dumps({
         "status": "ok",
         "total_papers": len(papers),
         "papers_with_code": papers_with_code,
+        "code_status_distribution": code_status_counts,
         "total_chunks": total_chunks,
     }, ensure_ascii=False)
