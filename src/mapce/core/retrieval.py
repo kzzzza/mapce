@@ -22,6 +22,11 @@ from mapce.db import get_connection, init_chunks, init_index_meta, sql_in_list, 
 # Data types
 # ---------------------------------------------------------------------------
 
+
+class VectorSearchError(RuntimeError):
+    """Raised when LanceDB vector search fails and no safe result exists."""
+
+
 @dataclass
 class SearchIntent:
     """Parsed search intent from a user query."""
@@ -242,6 +247,10 @@ def search(
 
     Returns:
         (expanded_results, intent) tuple.
+
+    Raises:
+        VectorSearchError: If LanceDB cannot execute a vector search. No
+            unranked fallback rows are returned in this case.
     """
     if db is None:
         db = get_connection()
@@ -287,9 +296,10 @@ def search(
     def _vsearch(where: str, limit: int) -> list[dict]:
         try:
             return table.search(query_emb).where(where).limit(limit).to_list()
-        except Exception:
-            # Fallback: non-vector scan (e.g. if the vector index is unavailable)
-            return table.search().where(where).limit(limit).to_list()
+        except Exception as exc:
+            raise VectorSearchError(
+                "Vector search failed; no fallback results were returned."
+            ) from exc
 
     # Paper prior = best chunk similarity + a light L1 "known-item anchor".
     #

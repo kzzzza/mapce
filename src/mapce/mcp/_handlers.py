@@ -7,10 +7,24 @@ and returns a JSON string.
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+
+logger = logging.getLogger("mapce.mcp")
+
+
+def _vector_search_error_response() -> str:
+    """Return a stable MCP response without exposing misleading results."""
+    return json.dumps({
+        "status": "error",
+        "error_code": "vector_search_failed",
+        "count": 0,
+        "results": [],
+        "message": "Vector search failed; no search results were returned.",
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -25,12 +39,17 @@ async def search_papers(
     venue: str | None = None,
 ) -> str:
     """Search indexed papers using 4-stage progressive retrieval."""
+    from mapce.core.retrieval import VectorSearchError
     from mapce.core.retrieval import search_papers as _search_papers
 
-    results, intent = _search_papers(
-        query=query, top_k=top_k,
-        year_min=year_min, year_max=year_max, venue=venue,
-    )
+    try:
+        results, intent = _search_papers(
+            query=query, top_k=top_k,
+            year_min=year_min, year_max=year_max, venue=venue,
+        )
+    except VectorSearchError:
+        logger.exception("Paper vector search failed")
+        return _vector_search_error_response()
 
     if not results:
         return json.dumps({
@@ -73,9 +92,14 @@ async def search_code(
     repo_name: str | None = None,
 ) -> str:
     """Search indexed code chunks."""
+    from mapce.core.retrieval import VectorSearchError
     from mapce.core.retrieval import search_code as _search_code
 
-    results, intent = _search_code(query=query, top_k=top_k, repo_name=repo_name)
+    try:
+        results, intent = _search_code(query=query, top_k=top_k, repo_name=repo_name)
+    except VectorSearchError:
+        logger.exception("Code vector search failed")
+        return _vector_search_error_response()
 
     if not results:
         return json.dumps({
