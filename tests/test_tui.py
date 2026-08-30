@@ -124,6 +124,8 @@ async def test_tui_renders_dashboard_and_keeps_service_running_on_exit():
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         assert app.query_one("#main-tabs", TabbedContent).active == "tab-dashboard"
+        assert app.title == "MAPCE"
+        assert app.sub_title == ""
         assert "PID 99" in str(app.query_one("#service-card", Static).content)
 
     assert client.closed is True

@@ -17,8 +17,8 @@ from .theme import APP_CSS
 class MapceTUI(App[None]):
     """Local paper-database management interface; it never opens LanceDB directly."""
 
-    TITLE = "MAPCE · 论文数据库管理器"
-    SUB_TITLE = "共享后台 · Agent 接口 · 本地管理"
+    TITLE = "MAPCE"
+    SUB_TITLE = ""
     CSS = APP_CSS
     BINDINGS = [
         Binding("q", "quit", "退出"),
