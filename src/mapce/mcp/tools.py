@@ -27,7 +27,7 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string", "description": "Search query (natural language or keywords)"},
-                "top_k": {"type": "integer", "description": "Max results (default: 10)", "default": 10},
+                "top_k": {"type": "integer", "description": "Max distinct papers (default: 10)", "default": 10},
                 "year_min": {"type": "integer", "description": "Filter: minimum publication year"},
                 "year_max": {"type": "integer", "description": "Filter: maximum publication year"},
                 "venue": {"type": "string", "description": "Filter: publication venue (e.g., CoRL, ICRA, RSS)"},

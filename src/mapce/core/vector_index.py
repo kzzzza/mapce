@@ -23,6 +23,8 @@ VECTOR_COLUMN = "embedding"
 VECTOR_INDEX_NAME = "embedding_ivf_pq"
 VECTOR_INDEX_TYPE = "IVF_PQ"
 VECTOR_DISTANCE = "l2"
+FTS_COLUMN = "fulltext_search"
+FTS_INDEX_NAME = "fulltext_search_fts"
 
 # 88,351 rows / ~4,096 rows per partition ~= 22.  Twenty-four leaves modest
 # growth headroom without making each query probe an excessive number of tiny
@@ -105,6 +107,15 @@ def has_vector_index(table: Any) -> bool:
     )
 
 
+def has_fts_index(table: Any) -> bool:
+    """Return whether the full-text search column has a completed FTS index."""
+    return any(
+        FTS_COLUMN in (getattr(index, "columns", None) or [])
+        and str(getattr(index, "index_type", "")).lower() == "fts"
+        for index in table.list_indices()
+    )
+
+
 def index_report(table: Any) -> dict[str, Any]:
     """Return serializable index coverage and configuration information."""
     rows = []
@@ -121,6 +132,7 @@ def index_report(table: Any) -> dict[str, Any]:
     return {
         "row_count": table.count_rows(),
         "vector_index_present": has_vector_index(table),
+        "fts_index_present": has_fts_index(table),
         "build_config": vector_index_config(),
         "search_config": vector_search_config(),
         "indices": rows,
@@ -132,7 +144,7 @@ def create_vector_indices(
     *,
     replace: bool = False,
 ) -> dict[str, Any]:
-    """Create the IVF_PQ index and all scalar prefilter indices.
+    """Create the IVF_PQ, scalar prefilter, and full-text indices.
 
     Existing indices are left intact unless ``replace`` is explicitly set.
     This builds auxiliary index files from stored vectors; it never recomputes
@@ -161,6 +173,18 @@ def create_vector_indices(
             index_type=index_type,
             name=name,
             replace=replace,
+        )
+
+    existing = _indices_by_name(table)
+    if FTS_INDEX_NAME not in existing or replace:
+        table.create_fts_index(
+            FTS_COLUMN,
+            name=FTS_INDEX_NAME,
+            replace=replace,
+            base_tokenizer="simple",
+            lower_case=True,
+            stem=False,
+            remove_stop_words=True,
         )
     return index_report(table)
 

@@ -9,14 +9,24 @@ Stage 4: Result assembly for prompt injection
 
 from __future__ import annotations
 
+import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 import lancedb
+from lancedb.query import FullTextOperator, MatchQuery
 
 from mapce.core.embedding import embed_single
-from mapce.core.vector_index import configure_vector_query, has_vector_index
+from mapce.core.vector_index import (
+    configure_vector_query,
+    has_fts_index,
+    has_vector_index,
+)
 from mapce.db import get_connection, get_meta, init_chunks, init_index_meta, sql_in_list, sql_str
+
+
+logger = logging.getLogger("mapce.retrieval")
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +74,7 @@ class RetrievalResult:
     figure_path: str | None = None
     table_markdown: str | None = None
     config_keys: list[str] = field(default_factory=list)
+    retrieval_sources: list[str] = field(default_factory=list)
 
 
 # Never copy the 1024-float embedding back into Python result dictionaries.
@@ -77,6 +88,7 @@ _RESULT_COLUMNS = [
     "figure_path", "table_markdown", "config_keys",
 ]
 _VECTOR_RESULT_COLUMNS = [*_RESULT_COLUMNS, "_distance"]
+_FTS_RESULT_COLUMNS = [*_RESULT_COLUMNS, "_score"]
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +136,11 @@ def parse_intent(query: str) -> SearchIntent:
     paper_score = sum(1 for kw in _INTENT_KEYWORDS["paper_search"] if kw in ql)
     code_score = sum(1 for kw in _INTENT_KEYWORDS["code_search"] if kw in ql)
 
-    if paper_score >= code_score and paper_score > 0:
+    short_acronym = bool(re.fullmatch(r"[A-Z][A-Z0-9-]{1,7}", query.strip()))
+
+    if short_acronym and code_score == 0:
+        intent = "paper_search"
+    elif paper_score >= code_score and paper_score > 0:
         intent = "paper_search"
     elif code_score > paper_score:
         intent = "code_search"
@@ -206,7 +222,11 @@ def _build_where_clause(filters: dict[str, Any], paper_ids: list[str] | None = N
     return " AND ".join(parts) if parts else None
 
 
-def _row_to_result(row: dict, score: float = 0.0) -> RetrievalResult:
+def _row_to_result(
+    row: dict,
+    score: float = 0.0,
+    retrieval_sources: list[str] | None = None,
+) -> RetrievalResult:
     """Convert a LanceDB row dict to a RetrievalResult."""
     return RetrievalResult(
         chunk_id=row.get("chunk_id", ""),
@@ -229,7 +249,131 @@ def _row_to_result(row: dict, score: float = 0.0) -> RetrievalResult:
         figure_path=row.get("figure_path"),
         table_markdown=row.get("table_markdown"),
         config_keys=row.get("config_keys") or [],
+        retrieval_sources=list(retrieval_sources or []),
     )
+
+
+_RRF_K = 60
+_SHORT_ACRONYM = re.compile(r"[A-Z][A-Z0-9-]{1,7}")
+_SOURCE_ORDER = {"fulltext": 0, "dense_fine": 1, "dense_l1": 2}
+
+
+def _unique_paper_rows(rows: list[dict]) -> list[tuple[int, dict]]:
+    """Return the first ranked row for each paper without copying embeddings."""
+    unique: list[tuple[int, dict]] = []
+    seen: set[str] = set()
+    for row in rows:
+        paper_id = row.get("paper_id")
+        if not paper_id or paper_id in seen:
+            continue
+        seen.add(paper_id)
+        unique.append((len(unique) + 1, row))
+    return unique
+
+
+def _rank_distinct_papers(
+    query: str,
+    l1_hits: list[dict],
+    fine_hits: list[dict],
+    fts_hits: list[dict],
+    top_k: int,
+) -> list[RetrievalResult]:
+    """Fuse L1, fine-grained, and lexical ranks into distinct paper results."""
+    short_acronym = bool(_SHORT_ACRONYM.fullmatch(query.strip()))
+    fts_weight = 2.0 if short_acronym else 1.0
+    signals = (
+        ("dense_l1", 1.0, _unique_paper_rows(l1_hits)),
+        ("dense_fine", 1.0, _unique_paper_rows(fine_hits)),
+        ("fulltext", fts_weight, _unique_paper_rows(fts_hits)),
+    )
+
+    scores: dict[str, float] = {}
+    dense_similarity: dict[str, float] = {}
+    lexical_score: dict[str, float] = {}
+    sources: dict[str, set[str]] = {}
+    ranks: dict[str, dict[str, int]] = {
+        "dense_l1": {},
+        "dense_fine": {},
+        "fulltext": {},
+    }
+    representatives: dict[str, tuple[float, int, dict]] = {}
+
+    for source, weight, ranked_rows in signals:
+        for rank, row in ranked_rows:
+            paper_id = row["paper_id"]
+            ranks[source][paper_id] = rank
+            contribution = weight / (_RRF_K + rank)
+            scores[paper_id] = scores.get(paper_id, 0.0) + contribution
+            sources.setdefault(paper_id, set()).add(source)
+
+            if source.startswith("dense"):
+                distance = row.get("_distance")
+                similarity = (
+                    1.0 / (1.0 + float(distance))
+                    if distance is not None
+                    else 0.0
+                )
+                dense_similarity[paper_id] = max(
+                    dense_similarity.get(paper_id, 0.0), similarity
+                )
+            else:
+                lexical_score[paper_id] = max(
+                    lexical_score.get(paper_id, 0.0),
+                    float(row.get("_score") or 0.0),
+                )
+
+            chunk_type = row.get("chunk_type") or ""
+            fine_priority = 0 if chunk_type in {"paper_l2", "paper_l3"} else 1
+            source_priority = _SOURCE_ORDER[source] * 2 + fine_priority
+            candidate = (contribution, -source_priority, row)
+            current = representatives.get(paper_id)
+            if current is None or candidate[:2] > current[:2]:
+                representatives[paper_id] = candidate
+
+    if not short_acronym:
+        # Preserve the empirically strong known-item and paragraph behavior of
+        # the previous dense ranker. Plain RRF lets a mediocre paper present in
+        # all three lists outrank the exact paragraph hit. Full text can still
+        # provide the representative evidence row, while acronym queries keep
+        # the stronger rank fusion needed for breadth.
+        allowed_papers = {
+            row.get("paper_id") for row in fine_hits if row.get("paper_id")
+        }
+        allowed_papers.update(
+            row.get("paper_id")
+            for row in l1_hits[:top_k]
+            if row.get("paper_id")
+        )
+        scores = {
+            paper_id: (
+                dense_similarity.get(paper_id, 0.0)
+                + (
+                    2.0 / (_RRF_K + ranks["dense_l1"][paper_id] - 1)
+                    if paper_id in ranks["dense_l1"]
+                    else 0.0
+                )
+            )
+            for paper_id in allowed_papers
+        }
+
+    ordered_papers = sorted(
+        scores,
+        key=lambda paper_id: (
+            -scores[paper_id],
+            -dense_similarity.get(paper_id, 0.0),
+            -lexical_score.get(paper_id, 0.0),
+            paper_id,
+        ),
+    )
+
+    results: list[RetrievalResult] = []
+    for paper_id in ordered_papers[:top_k]:
+        row = representatives[paper_id][2]
+        result_sources = sorted(
+            sources[paper_id], key=lambda source: _SOURCE_ORDER[source]
+        )
+        results.append(_row_to_result(row, scores[paper_id], result_sources))
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -288,7 +432,9 @@ def search(
     if venue is not None:
         intent.filters["venue"] = venue
 
-    if top_k_chunks <= 0:
+    if top_k_chunks <= 0 or (
+        intent.intent == "paper_search" and top_k_papers <= 0
+    ):
         return [], intent
 
     table = init_chunks(db)
@@ -330,6 +476,30 @@ def search(
             raise VectorSearchError(
                 "Vector search failed; no fallback results were returned."
             ) from exc
+
+    def _fts_search(where: str, limit: int) -> list[dict]:
+        if not query.strip() or not has_fts_index(table):
+            return []
+        try:
+            fts_query = MatchQuery(
+                query.strip(),
+                "fulltext_search",
+                fuzziness=0,
+                operator=FullTextOperator.OR,
+            )
+            return (
+                table.search(fts_query)
+                .where(where, prefilter=True)
+                .select(_FTS_RESULT_COLUMNS)
+                .limit(limit)
+                .to_list()
+            )
+        except Exception:
+            logger.warning(
+                "Full-text paper search failed; continuing with vector results.",
+                exc_info=True,
+            )
+            return []
 
     # Paper prior = best chunk similarity + a light L1 "known-item anchor".
     #
@@ -378,7 +548,33 @@ def search(
     if intent.filters.get("venue"):
         paper_filter += f" AND venue = {sql_str(intent.filters['venue'])}"
 
-    # Wider pool than top_k_chunks since hits span L2 and L3 granularities.
+    if intent.intent == "paper_search":
+        candidate_limit = max(200, top_k_papers * 20)
+        short_acronym = bool(_SHORT_ACRONYM.fullmatch(query.strip()))
+        fine_limit = candidate_limit if short_acronym else top_k_chunks * 3
+        l1_hits = _vsearch(
+            "chunk_type = 'paper_l1'" + paper_filter, candidate_limit
+        )
+        fine_hits = _vsearch(
+            "chunk_type IN ('paper_l2', 'paper_l3')" + paper_filter,
+            fine_limit,
+        )
+        fts_hits = _fts_search(
+            "chunk_type IN ('paper_l1', 'paper_l2', 'paper_l3')" + paper_filter,
+            candidate_limit,
+        )
+        return (
+            _rank_distinct_papers(
+                query,
+                l1_hits,
+                fine_hits,
+                fts_hits,
+                top_k_papers,
+            ),
+            intent,
+        )
+
+    # Wider pool than top_k_chunks since code and hybrid hits span granularities.
     paper_limit = top_k_chunks * 3
 
     if intent.intent == "code_search":
@@ -500,10 +696,16 @@ def _expand_context(
                     .limit(20)
                     .to_list()
                 )
-                # Filter L3 rows that are roughly within the same section
-                l2_heading = section_path.split(" > ")[0] if section_path else ""
+                # Keep downward expansion within the matched section. The old
+                # code computed a heading but never applied it, so unrelated L3
+                # paragraphs from the same paper could fill the context budget.
                 for l3_row in l3_rows:
                     l3_path = l3_row.get("section_path", "")
+                    if section_path and not (
+                        l3_path == section_path
+                        or l3_path.startswith(section_path + " > ")
+                    ):
+                        continue
                     if (l3_id := l3_row["chunk_id"]) not in seen_ids:
                         expanded.append(_row_to_result(l3_row, score * 0.9))
                         seen_ids.add(l3_id)
@@ -630,12 +832,12 @@ def search_papers(
     year_max: int | None = None,
     venue: str | None = None,
 ) -> tuple[list[RetrievalResult], SearchIntent]:
-    """Convenience wrapper for paper-only search."""
+    """Search for up to ``top_k`` distinct papers."""
     intent = SearchIntent(intent="paper_search", sub_type="general")
     return search(
         query=query,
         intent=intent,
-        top_k_papers=20,
+        top_k_papers=top_k,
         top_k_chunks=top_k,
         year_min=year_min,
         year_max=year_max,

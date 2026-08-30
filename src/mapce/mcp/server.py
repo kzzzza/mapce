@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from mcp.server import Server
@@ -32,14 +33,22 @@ logger = logging.getLogger("mapce.mcp")
 
 @asynccontextmanager
 async def mapce_lifespan(server: Server):
-    """Startup: warm up embedding model. Shutdown: cleanup."""
+    """Start the server, optionally warming the embedding model."""
     logger.info("MAPCE MCP Server starting up...")
-    try:
-        from mapce.core.embedding import embed_single
-        _ = embed_single("startup warmup")
-        logger.info("Embedding model loaded.")
-    except Exception as e:
-        logger.warning(f"Embedding model warm-up failed (will load on first use): {e}")
+    warmup = os.environ.get("MAPCE_WARMUP_EMBEDDING", "0").lower() in {
+        "1", "true", "yes", "on",
+    }
+    if warmup:
+        try:
+            from mapce.core.embedding import embed_single
+            _ = embed_single("startup warmup")
+            logger.info("Embedding model loaded.")
+        except Exception as e:
+            logger.warning(
+                "Embedding model warm-up failed (will load on first use): %s", e
+            )
+    else:
+        logger.info("Embedding model warm-up disabled; model will load on demand.")
     try:
         yield
     finally:

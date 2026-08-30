@@ -73,6 +73,8 @@ async def search_papers(
                 "section_path": r.section_path,
                 "content": r.content[:2000],
                 "figure_path": r.figure_path,
+                "score": r.score,
+                "retrieval_sources": r.retrieval_sources,
             }
             for r in results
         ],

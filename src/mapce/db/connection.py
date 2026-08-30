@@ -1,6 +1,7 @@
 """Database connection management."""
 
 import os
+from functools import lru_cache
 from pathlib import Path
 
 import lancedb
@@ -20,6 +21,12 @@ def _ensure_dir(path: Path) -> Path:
     return path
 
 
+@lru_cache(maxsize=4)
+def _connect_cached(path: str) -> lancedb.DBConnection:
+    """Reuse LanceDB connections instead of accumulating per-query runtimes."""
+    return lancedb.connect(path)
+
+
 def get_connection(data_dir: Path | None = None) -> lancedb.DBConnection:
     """Get a LanceDB connection, creating the data directory if needed.
 
@@ -30,6 +37,6 @@ def get_connection(data_dir: Path | None = None) -> lancedb.DBConnection:
     Returns:
         A LanceDB DBConnection instance.
     """
-    path = data_dir or _get_data_dir()
+    path = (data_dir or _get_data_dir()).expanduser().resolve()
     _ensure_dir(path)
-    return lancedb.connect(str(path))
+    return _connect_cached(str(path))
