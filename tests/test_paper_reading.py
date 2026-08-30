@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 
 import lancedb
 import pytest
 
 from mapce.application import papers
 from mapce.core.retrieval import get_paper_overview
+from mapce.mcp import _handlers
 from mapce.db.schema import CHUNKS_SCHEMA, INDEX_META_SCHEMA
 
 
@@ -40,6 +42,8 @@ def _chunk(
     chunk_index,
     content,
     vector_value,
+    year=None,
+    venue=None,
 ):
     vector = [0.0] * 1024
     vector[0] = vector_value
@@ -54,6 +58,8 @@ def _chunk(
         embedding=vector,
         title=f"Title {paper_id}",
         authors=["Ada Researcher"],
+        year=year,
+        venue=venue,
         section_path=section_path,
         section_level=3 if chunk_type == "paper_l3" else 2,
         chunk_index=chunk_index,
@@ -74,7 +80,10 @@ def paper_db(tmp_path):
     chunks = db.create_table("chunks", schema=CHUNKS_SCHEMA)
     chunks.add(
         [
-            _chunk("p1-l1", "paper-one", "paper_l1", "", 0, "abstract", 0.1),
+            _chunk(
+                "p1-l1", "paper-one", "paper_l1", "", 0, "abstract", 0.1,
+                year=2024, venue="ICML",
+            ),
             _chunk("p1-l2", "paper-one", "paper_l2", "1. Method", 0, "method section", 0.8),
             _chunk("p1-l3-a", "paper-one", "paper_l3", "1. Method", 1, "forward backward method", 1.0),
             _chunk("p1-l3-b", "paper-one", "paper_l3", "1. Method", 2, "training objective", 0.9),
@@ -119,6 +128,20 @@ def test_resolve_paper_reports_invalid_and_missing_ids(paper_db):
 
     assert invalid["error_code"] == "invalid_arxiv_id"
     assert missing["error_code"] == "paper_not_indexed"
+
+
+@pytest.mark.asyncio
+async def test_list_indexed_papers_includes_lightweight_year_and_venue(
+    paper_db, monkeypatch
+):
+    import mapce.db
+
+    monkeypatch.setattr(mapce.db, "get_connection", lambda: paper_db)
+    payload = json.loads(await _handlers.list_indexed_papers())
+    paper = next(row for row in payload["papers"] if row["paper_id"] == "paper-one")
+
+    assert paper["year"] == 2024
+    assert paper["venue"] == "ICML"
 
 
 def test_read_section_paginates_l3_without_crossing_boundary(paper_db):

@@ -119,7 +119,7 @@ Run `mapce` without a subcommand to open the Textual TUI. It accesses the databa
 uv run --env-file .env mapce
 ```
 
-The five tabs cover dashboard, paper inventory, indexing, jobs, and system diagnostics. The paper inventory uses one scrollable table without pagination. You can resolve a paper by internal ID or arXiv ID, inspect paper/code state, submit indexing and deletion jobs, review repository candidates, and inspect logs. Pressing `q` closes only the UI client and leaves the service running.
+The five tabs cover dashboard, paper inventory, indexing, jobs, and system diagnostics. The paper inventory uses one numbered scrollable table without pagination and can sort by publication year, indexing time, title, Paper ID, chunk count, or code status. You can resolve a paper by internal ID or arXiv ID, inspect paper/code state, submit indexing and deletion jobs, review repository candidates, and inspect logs. Pressing `q` closes only the UI client and leaves the service running.
 
 For scripted management, use `mapce papers`, `mapce search`, `mapce index`, `mapce jobs`, `mapce stats`, and `mapce doctor`; run each command with `--help` for its options.
 

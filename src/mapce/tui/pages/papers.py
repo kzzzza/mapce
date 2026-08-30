@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from typing import Any
 
 from rich.markup import escape
@@ -41,6 +42,24 @@ class PapersPane(Vertical):
                 allow_blank=False,
                 id="paper-code-status",
             )
+            yield Select(
+                [
+                    ("发表年份 · 最新", "year_desc"),
+                    ("发表年份 · 最早", "year_asc"),
+                    ("入库时间 · 最新", "indexed_desc"),
+                    ("入库时间 · 最早", "indexed_asc"),
+                    ("标题 · A–Z", "title_asc"),
+                    ("标题 · Z–A", "title_desc"),
+                    ("Paper ID · 升序", "id_asc"),
+                    ("Paper ID · 降序", "id_desc"),
+                    ("Chunk 数量 · 多到少", "chunks_desc"),
+                    ("Chunk 数量 · 少到多", "chunks_asc"),
+                    ("代码状态", "code_status_asc"),
+                ],
+                value="year_desc",
+                allow_blank=False,
+                id="paper-sort",
+            )
         with Horizontal(classes="split"):
             with Vertical(classes="split-left"):
                 yield DataTable(id="papers-table", cursor_type="row")
@@ -51,7 +70,7 @@ class PapersPane(Vertical):
 
     def on_mount(self) -> None:
         table = self.query_one("#papers-table", DataTable)
-        table.add_columns("Paper ID", "标题", "年份", "论文状态", "代码状态")
+        table.add_columns("序号", "Paper ID", "标题", "年份", "论文状态", "代码状态")
 
     def _filters(self) -> tuple[int | None, int | None, str, str]:
         def integer(selector: str) -> int | None:
@@ -82,16 +101,57 @@ class PapersPane(Vertical):
         return filtered
 
     def _set_rows(self, rows: list[dict[str, Any]]) -> None:
-        self.rows = rows
+        self.rows = self._sort_rows(rows)
         self.rows_by_id = {str(row.get("paper_id")): row for row in rows if row.get("paper_id")}
         self._render_rows()
+
+    @staticmethod
+    def _indexed_timestamp(value: Any) -> float | None:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+        except (TypeError, ValueError):
+            return None
+
+    def _sort_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        sort_name = str(self.query_one("#paper-sort", Select).value or "year_desc")
+        field, direction = sort_name.rsplit("_", 1)
+        reverse = direction == "desc"
+
+        def primary(row: dict[str, Any]) -> Any:
+            if field == "year":
+                value = row.get("year")
+                return int(value) if value is not None else None
+            if field == "indexed":
+                return self._indexed_timestamp(row.get("indexed_at"))
+            if field == "title":
+                return str(row.get("title") or "").casefold()
+            if field == "id":
+                return str(row.get("paper_id") or "").casefold()
+            if field == "chunks":
+                value = row.get("chunk_count")
+                return int(value) if value is not None else None
+            return str(row.get("code_status") or "").casefold()
+
+        tie_sorted = sorted(
+            rows,
+            key=lambda row: (
+                str(row.get("title") or "").casefold(),
+                str(row.get("paper_id") or "").casefold(),
+            ),
+        )
+        known = [row for row in tie_sorted if primary(row) is not None]
+        missing = [row for row in tie_sorted if primary(row) is None]
+        return sorted(known, key=primary, reverse=reverse) + missing
 
     def _render_rows(self) -> None:
         table = self.query_one("#papers-table", DataTable)
         table.clear()
-        for row in self.rows:
+        for number, row in enumerate(self.rows, start=1):
             paper_id = str(row.get("paper_id", ""))
             table.add_row(
+                str(number),
                 paper_id,
                 str(row.get("title", ""))[:80],
                 str(row.get("year") or "—"),
@@ -99,6 +159,11 @@ class PapersPane(Vertical):
                 str(row.get("code_status") or ""),
                 key=paper_id,
             )
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if event.select.id == "paper-sort" and self.is_mounted:
+            self.rows = self._sort_rows(self.rows)
+            self._render_rows()
 
     @work(exclusive=True, group="paper-list")
     async def load_all(self) -> None:

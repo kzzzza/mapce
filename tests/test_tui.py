@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
-from textual.widgets import Button, DataTable, Static, TabbedContent
+from textual.widgets import Button, DataTable, Select, Static, TabbedContent
 
 from mapce.tui.app import MapceTUI
 from mapce.tui.pages import PapersPane
@@ -182,6 +182,31 @@ async def test_paper_inventory_renders_all_rows_in_one_scrollable_table():
         assert table.row_count == 75
         assert not app.query("#papers-prev")
         assert not app.query("#papers-next")
+
+
+@pytest.mark.asyncio
+async def test_paper_inventory_numbers_rows_and_applies_selected_sort():
+    app = MapceTUI(client=FakeClient())
+    async with app.run_test(size=(120, 40)) as pilot:
+        app.query_one("#main-tabs", TabbedContent).active = "tab-papers"
+        await pilot.pause()
+        pane = app.query_one(PapersPane)
+        pane._set_rows(
+            [
+                {"paper_id": "unknown", "title": "Gamma", "year": None},
+                {"paper_id": "older", "title": "Alpha", "year": 2022},
+                {"paper_id": "newer", "title": "Beta", "year": 2025},
+            ]
+        )
+        table = app.query_one("#papers-table", DataTable)
+
+        assert [row["paper_id"] for row in pane.rows] == ["newer", "older", "unknown"]
+        assert [table.get_row_at(index)[0] for index in range(3)] == ["1", "2", "3"]
+
+        app.query_one("#paper-sort", Select).value = "title_asc"
+        await pilot.pause()
+
+        assert [row["paper_id"] for row in pane.rows] == ["older", "newer", "unknown"]
 
 
 @pytest.mark.asyncio

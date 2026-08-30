@@ -286,6 +286,28 @@ async def list_indexed_papers() -> str:
         "chunk_count", "has_code", "code_indexed", "code_status", "status",
     ])
 
+    paper_details: dict[str, dict] = {}
+    try:
+        l1_rows = (
+            db.open_table("chunks")
+            .search()
+            .where("chunk_type = 'paper_l1'", prefilter=True)
+            .select(["paper_id", "year", "venue"])
+            .limit(10000)
+            .to_list()
+        )
+        for row in l1_rows:
+            paper_id = str(row.get("paper_id") or "")
+            if not paper_id:
+                continue
+            details = paper_details.setdefault(paper_id, {"year": None, "venue": None})
+            if details["year"] is None and row.get("year") is not None:
+                details["year"] = row.get("year")
+            if not details["venue"] and row.get("venue"):
+                details["venue"] = row.get("venue")
+    except Exception:
+        logger.warning("Failed to load paper year/venue metadata", exc_info=True)
+
     if not papers:
         return json.dumps({"status": "ok", "count": 0, "papers": []})
 
@@ -299,6 +321,8 @@ async def list_indexed_papers() -> str:
                 "authors": p.get("authors") or [],
                 "arxiv_id": p.get("arxiv_id"),
                 "indexed_at": p["indexed_at"],
+                "year": paper_details.get(p["paper_id"], {}).get("year"),
+                "venue": paper_details.get(p["paper_id"], {}).get("venue"),
                 "chunk_count": p["chunk_count"],
                 "has_code": p["has_code"],
                 "code_indexed": p["code_indexed"],

@@ -76,7 +76,13 @@ TabPane {
 }
 
 .filters Input {
-    width: 18;
+    width: 1fr;
+    min-width: 10;
+}
+
+.filters Select {
+    width: 1fr;
+    min-width: 16;
 }
 
 Button.-primary {

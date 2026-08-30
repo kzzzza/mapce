@@ -119,7 +119,7 @@ uv run --env-file .env mapce serve-restart  # 重启服务
 uv run --env-file .env mapce
 ```
 
-界面包含总览、论文库、索引、任务和系统五个页签。论文库使用单页滚动表格，可按内部 ID 或 arXiv 编号精确查找论文、查看论文与代码状态、提交索引/删除任务、审核候选仓库、查看日志和诊断后台。按 `q` 退出界面不会停止后台服务。
+界面包含总览、论文库、索引、任务和系统五个页签。论文库使用带序号的单页滚动表格，可按发表年份、入库时间、标题、Paper ID、Chunk 数量或代码状态排序，并支持内部 ID/arXiv 编号精确查找。界面还可查看论文与代码状态、提交索引/删除任务、审核候选仓库、查看日志和诊断后台。按 `q` 退出界面不会停止后台服务。
 
 需要脚本化管理时，可使用 `mapce papers`、`mapce search`、`mapce index`、`mapce jobs`、`mapce stats` 和 `mapce doctor`；各子命令可通过 `--help` 查看参数。
 
