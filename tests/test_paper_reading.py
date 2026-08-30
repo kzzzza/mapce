@@ -6,6 +6,7 @@ import lancedb
 import pytest
 
 from mapce.application import papers
+from mapce.core.retrieval import get_paper_overview
 from mapce.db.schema import CHUNKS_SCHEMA, INDEX_META_SCHEMA
 
 
@@ -157,6 +158,18 @@ def test_read_section_can_include_subsections_and_validate_chunk_ownership(paper
         "p1-sub-l3",
     ]
     assert wrong_paper["error_code"] == "chunk_not_found"
+
+
+def test_overview_section_chunk_id_can_be_read_directly(paper_db):
+    overview = get_paper_overview("paper-one", db=paper_db)
+    method = next(row for row in overview["sections"] if row["heading"] == "1. Method")
+
+    result = papers.read_paper_section(
+        "paper-one", chunk_id=method["chunk_id"], limit=10, db=paper_db
+    )
+
+    assert result["status"] == "ok"
+    assert [row["chunk_id"] for row in result["chunks"]] == ["p1-l3-a", "p1-l3-b"]
 
 
 def test_read_section_rejects_cursor_from_different_selector(paper_db):

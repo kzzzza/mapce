@@ -250,40 +250,55 @@ def read_paper_section(
 
     pid_filter = f"paper_id = {sql_str(paper_id)} AND source_type = 'paper'"
     selected_chunk: dict[str, Any] | None = None
+    paper_rows: list[dict[str, Any]] | None = None
     if chunk_id:
         try:
-            rows = (
+            # Some existing LanceDB datasets return an empty result when a
+            # chunk_id equality is combined with an indexed paper_id filter,
+            # even though each predicate succeeds alone. Use the paper_id
+            # scalar index to fetch one paper's lightweight rows, then validate
+            # the exact chunk ID in Python. Embeddings are never selected.
+            paper_rows = (
                 table.search()
-                .where(f"{pid_filter} AND chunk_id = {sql_str(chunk_id)}", prefilter=True)
+                .where(pid_filter, prefilter=True)
                 .select(_READ_COLUMNS)
-                .limit(1)
+                .limit(10000)
                 .to_list()
             )
         except Exception:
-            rows = []
-        if not rows:
+            paper_rows = []
+        selected_chunk = next(
+            (row for row in paper_rows if row.get("chunk_id") == chunk_id),
+            None,
+        )
+        if selected_chunk is None:
             return {
                 "status": "error",
                 "error_code": "chunk_not_found",
                 "message": f"Chunk does not belong to paper {paper_id}: {chunk_id}",
             }
-        selected_chunk = rows[0]
         if selected_chunk.get("chunk_type") != "paper_l2":
             candidates = [selected_chunk]
         else:
             section_path = selected_chunk.get("section_path") or ""
 
     if section_path is not None and (selected_chunk is None or selected_chunk.get("chunk_type") == "paper_l2"):
-        try:
-            all_rows = (
-                table.search()
-                .where(f"{pid_filter} AND chunk_type IN ('paper_l2', 'paper_l3')", prefilter=True)
-                .select(_READ_COLUMNS)
-                .limit(10000)
-                .to_list()
-            )
-        except Exception:
-            all_rows = []
+        if paper_rows is None:
+            try:
+                all_rows = (
+                    table.search()
+                    .where(f"{pid_filter} AND chunk_type IN ('paper_l2', 'paper_l3')", prefilter=True)
+                    .select(_READ_COLUMNS)
+                    .limit(10000)
+                    .to_list()
+                )
+            except Exception:
+                all_rows = []
+        else:
+            all_rows = [
+                row for row in paper_rows
+                if row.get("chunk_type") in {"paper_l2", "paper_l3"}
+            ]
         candidates = [
             row
             for row in all_rows
