@@ -115,7 +115,7 @@ uv run --env-file .env mapce serve-restart  # 重启服务
 
 | 文档 | 内容 |
 |------|------|
-| [docs/usage.md](docs/usage.md) | Python SDK 用法、MCP 工具参考（8 个）、Claude Code 集成 |
+| [docs/usage.md](docs/usage.md) | Python SDK 用法、MCP 工具参考（11 个）、论文深度读取、Claude Code 集成 |
 | [docs/data-sources.md](docs/data-sources.md) | 数据源适配器（arXiv、Zotero、本地 PDF、目录批量） |
 | [docs/storage.md](docs/storage.md) | 存储形式：LanceDB、模型缓存、临时文件、清理 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题与解决方案 |

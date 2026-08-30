@@ -76,6 +76,8 @@ print(asyncio.run(list_indexed_papers()))
 
 ## MCP 工具参考
 
+所有工具都声明 `outputSchema`。新版 MCP 客户端可读取 `structuredContent`；兼容旧客户端的 JSON `TextContent` 仍会同时返回。失败结果设置 `isError=true`，并包含稳定的 `error_code`。
+
 ### search_papers
 
 | 参数 | 类型 | 必填 | 说明 |
@@ -126,6 +128,49 @@ print(asyncio.run(list_indexed_papers()))
 | `paper_id` | string | 是 | 论文 ID |
 
 > 帮我看看这篇论文的章节结构、图表清单
+
+### resolve_paper
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `identifier` | string | 是 | 内部论文 ID、arXiv ID、带版本号 ID、`arXiv:` 前缀或 arXiv URL |
+
+该工具只查询本地 `index_meta`，不会联网，也不会加载嵌入模型。版本号会被移除，旧式 ID（如 `hep-th/9901001`）同样支持。
+
+### read_paper_section
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `paper_id` | string | 是 | `resolve_paper` 返回的统一论文 ID |
+| `section_path` | string | 二选一 | 精确章节路径 |
+| `chunk_id` | string | 二选一 | 目录或检索结果中的 chunk ID |
+| `include_subsections` | bool | 否 | 是否包含下级章节，默认 `false` |
+| `limit` | int | 否 | 每页 1–20 个 chunk，默认 10 |
+| `cursor` | string | 否 | 上一页返回的游标 |
+
+章节读取优先返回 L3 段落，避免重复附带含有相同正文的 L2 大块。结果包含章节、层级、顺序、前后 chunk 和正文，不包含 embedding。
+
+### search_paper_content
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `paper_id` | string | 是 | 要检索的单篇论文 |
+| `query` | string | 是 | 论文内部问题或关键词 |
+| `top_k` | int | 否 | 返回 1–20 个相关 chunk，默认 10 |
+
+该工具只检索指定论文，可以返回多个正文 chunk；它与 `search_papers` 的“每篇论文最多返回一次”语义相互独立。
+
+### Agent 深度阅读顺序
+
+```text
+resolve_paper
+  → get_paper_overview
+  → read_paper_section / search_paper_content
+  → search_code（论文存在已索引代码时）
+  → Agent 组织理解结果或论文笔记
+```
+
+MAPCE 返回正文和来源定位，笔记撰写仍由调用它的 Agent 完成。
 
 ### 无参数工具
 

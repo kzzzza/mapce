@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
-
 from mcp.server import Server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, Tool
 
 from mapce.application import ToolDispatcher
 
 from .tools import TOOL_DEFINITIONS
+from .protocol import to_mcp_result
 
 
 def create_backend_mcp_server(dispatcher: ToolDispatcher) -> Server:
@@ -20,13 +19,8 @@ def create_backend_mcp_server(dispatcher: ToolDispatcher) -> Server:
         return TOOL_DEFINITIONS
 
     @server.call_tool()
-    async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
+    async def handle_call_tool(name: str, arguments: dict) -> CallToolResult:
         result = await dispatcher.call(name, arguments)
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps(result, ensure_ascii=False),
-            )
-        ]
+        return to_mcp_result(result)
 
     return server

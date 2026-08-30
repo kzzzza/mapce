@@ -230,12 +230,18 @@ def get_meta(table: Any, paper_id: str) -> dict | None:
         return None
 
 
-def list_all_meta(table: Any) -> list[dict]:
+def list_all_meta(table: Any, columns: list[str] | None = None) -> list[dict]:
     """List all non-deleted index entries."""
     try:
-        return table.search().where("status != 'deleted'").to_list()
+        query = table.search().where("status != 'deleted'")
+        if columns is not None:
+            query = query.select(columns)
+        return query.to_list()
     except Exception:
-        return table.search().to_list()
+        query = table.search()
+        if columns is not None:
+            query = query.select(columns)
+        return query.to_list()
 
 
 def _make_id() -> str:

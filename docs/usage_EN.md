@@ -76,6 +76,8 @@ The `vector_index` field returned by `get_stats` includes IVF_PQ/scalar indices,
 
 ## MCP Tool Reference
 
+Every tool declares an `outputSchema`. New MCP clients receive `structuredContent`, while a JSON `TextContent` fallback remains available for older clients. Failed calls set `isError=true` and include a stable `error_code`.
+
 ### search_papers
 
 | Parameter | Type | Required | Description |
@@ -126,6 +128,49 @@ The `vector_index` field returned by `get_stats` includes IVF_PQ/scalar indices,
 | `paper_id` | string | yes | Paper ID |
 
 > Show me the section structure and figure/table list for this paper
+
+### resolve_paper
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `identifier` | string | yes | Internal paper ID, arXiv ID, versioned ID, `arXiv:` prefix, or arXiv URL |
+
+This tool only queries local `index_meta`. It does not access the network or load the embedding model. Versions are removed, and legacy IDs such as `hep-th/9901001` are supported.
+
+### read_paper_section
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `paper_id` | string | yes | Canonical paper ID returned by `resolve_paper` |
+| `section_path` | string | one of two | Exact section path |
+| `chunk_id` | string | one of two | Chunk ID from an overview or search result |
+| `include_subsections` | bool | no | Include descendant sections; default `false` |
+| `limit` | int | no | 1–20 chunks per page; default 10 |
+| `cursor` | string | no | Cursor returned by the previous page |
+
+Section reading prefers L3 paragraphs, avoiding duplicate L2 blocks containing the same text. Results include section, level, order, neighboring chunk IDs, and content, but no embedding vector.
+
+### search_paper_content
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `paper_id` | string | yes | One paper to search |
+| `query` | string | yes | Question or keywords within the paper |
+| `top_k` | int | no | Return 1–20 relevant chunks; default 10 |
+
+This tool searches only the specified paper and can return multiple content chunks. Its semantics are separate from `search_papers`, which returns each paper at most once.
+
+### Agent Deep-Reading Flow
+
+```text
+resolve_paper
+  → get_paper_overview
+  → read_paper_section / search_paper_content
+  → search_code (when indexed code exists)
+  → Agent organizes an explanation or paper notes
+```
+
+MAPCE returns content with source locations; the calling Agent remains responsible for writing notes.
 
 ### Parameterless Tools
 

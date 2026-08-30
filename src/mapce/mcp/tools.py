@@ -6,13 +6,61 @@ Tool definitions (Tool objects) are defined at module level for registration.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 from mcp.types import Tool
 
 # Import handlers — they return JSON strings
 from . import _handlers
+
+
+STATUS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "status": {"type": "string"},
+        "error_code": {"type": "string"},
+        "message": {"type": ["string", "null"]},
+    },
+    "required": ["status"],
+    "additionalProperties": True,
+}
+
+RESOLVE_PAPER_OUTPUT_SCHEMA = {
+    **STATUS_OUTPUT_SCHEMA,
+    "properties": {
+        **STATUS_OUTPUT_SCHEMA["properties"],
+        "input": {"type": "string"},
+        "paper_id": {"type": "string"},
+        "arxiv_id": {"type": ["string", "null"]},
+        "title": {"type": "string"},
+        "authors": {"type": "array", "items": {"type": "string"}},
+        "paper_status": {"type": "string"},
+        "code_status": {"type": "string"},
+        "indexed_at": {"type": ["string", "null"]},
+    },
+}
+
+READ_SECTION_OUTPUT_SCHEMA = {
+    **STATUS_OUTPUT_SCHEMA,
+    "properties": {
+        **STATUS_OUTPUT_SCHEMA["properties"],
+        "paper_id": {"type": "string"},
+        "section_path": {"type": ["string", "null"]},
+        "count": {"type": "integer"},
+        "total_chunks": {"type": "integer"},
+        "next_cursor": {"type": ["string", "null"]},
+        "chunks": {"type": "array", "items": {"type": "object"}},
+    },
+}
+
+SEARCH_CONTENT_OUTPUT_SCHEMA = {
+    **STATUS_OUTPUT_SCHEMA,
+    "properties": {
+        **STATUS_OUTPUT_SCHEMA["properties"],
+        "paper_id": {"type": "string"},
+        "query": {"type": "string"},
+        "count": {"type": "integer"},
+        "results": {"type": "array", "items": {"type": "object"}},
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +82,7 @@ TOOL_DEFINITIONS = [
             },
             "required": ["query"],
         },
+        outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
         name="search_code",
@@ -49,6 +98,7 @@ TOOL_DEFINITIONS = [
             },
             "required": ["query"],
         },
+        outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
         name="index_paper",
@@ -72,6 +122,7 @@ TOOL_DEFINITIONS = [
             },
             "required": ["source"],
         },
+        outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
         name="index_code",
@@ -84,11 +135,13 @@ TOOL_DEFINITIONS = [
             },
             "required": ["repo_url", "paper_id"],
         },
+        outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
         name="list_indexed_papers",
         description="List all papers currently in the index with their status.",
         inputSchema={"type": "object", "properties": {}},
+        outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
         name="get_paper_overview",
@@ -100,6 +153,7 @@ TOOL_DEFINITIONS = [
             },
             "required": ["paper_id"],
         },
+        outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
         name="delete_paper",
@@ -111,11 +165,72 @@ TOOL_DEFINITIONS = [
             },
             "required": ["paper_id"],
         },
+        outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
         name="get_stats",
         description="Get index statistics: total papers, chunks, papers with code.",
         inputSchema={"type": "object", "properties": {}},
+        outputSchema=STATUS_OUTPUT_SCHEMA,
+    ),
+    Tool(
+        name="resolve_paper",
+        description=(
+            "Resolve an indexed paper from an internal ID, arXiv ID, arXiv: prefix, "
+            "versioned ID, or arXiv URL. This performs no network request."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "identifier": {
+                    "type": "string",
+                    "description": "Internal paper ID or arXiv reference",
+                },
+            },
+            "required": ["identifier"],
+        },
+        outputSchema=RESOLVE_PAPER_OUTPUT_SCHEMA,
+    ),
+    Tool(
+        name="read_paper_section",
+        description=(
+            "Read paginated paper content by exact section path or chunk ID. "
+            "Returns source locations and text without embedding vectors."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "paper_id": {"type": "string"},
+                "section_path": {"type": "string"},
+                "chunk_id": {"type": "string"},
+                "include_subsections": {"type": "boolean", "default": False},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 10},
+                "cursor": {"type": "string"},
+            },
+            "required": ["paper_id"],
+            "oneOf": [
+                {"required": ["section_path"], "not": {"required": ["chunk_id"]}},
+                {"required": ["chunk_id"], "not": {"required": ["section_path"]}},
+            ],
+        },
+        outputSchema=READ_SECTION_OUTPUT_SCHEMA,
+    ),
+    Tool(
+        name="search_paper_content",
+        description=(
+            "Search for multiple relevant chunks inside one indexed paper. "
+            "Unlike search_papers, results are not deduplicated at paper level."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "paper_id": {"type": "string"},
+                "query": {"type": "string"},
+                "top_k": {"type": "integer", "minimum": 1, "maximum": 20, "default": 10},
+            },
+            "required": ["paper_id", "query"],
+        },
+        outputSchema=SEARCH_CONTENT_OUTPUT_SCHEMA,
     ),
 ]
 
@@ -132,4 +247,7 @@ HANDLERS = {
     "get_paper_overview": _handlers.get_paper_overview,
     "delete_paper": _handlers.delete_paper,
     "get_stats": _handlers.get_stats,
+    "resolve_paper": _handlers.resolve_paper,
+    "read_paper_section": _handlers.read_paper_section,
+    "search_paper_content": _handlers.search_paper_content,
 }

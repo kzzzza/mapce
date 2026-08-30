@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from contextlib import asynccontextmanager
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolResult, Tool
 
 from mapce.client import MapceClient, ServiceClientError
 
 from .tools import TOOL_DEFINITIONS
+from .protocol import to_mcp_result
 
 logger = logging.getLogger("mapce.mcp.proxy")
 
@@ -37,7 +37,7 @@ def create_server() -> Server:
         return TOOL_DEFINITIONS
 
     @server.call_tool()
-    async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
+    async def handle_call_tool(name: str, arguments: dict) -> CallToolResult:
         try:
             result = await client.call_tool_async(name, arguments)
         except ServiceClientError as exc:
@@ -46,7 +46,7 @@ def create_server() -> Server:
                 "error_code": exc.error_code,
                 "message": str(exc),
             }
-        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
+        return to_mcp_result(result)
 
     return server
 

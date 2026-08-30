@@ -133,7 +133,7 @@ results, _ = search_code('self-attention transformer implementation')
 
 | Doc | Content |
 |-----|---------|
-| [docs/usage.md](docs/usage.md) | Python SDK usage, MCP tool reference (8 tools), Claude Code integration |
+| [docs/usage.md](docs/usage.md) | Python SDK usage, MCP tool reference (11 tools), deep paper reading, Claude Code integration |
 | [docs/data-sources.md](docs/data-sources.md) | Data source adapters (arXiv, Zotero, local PDF, batch directory) |
 | [docs/storage.md](docs/storage.md) | Storage: LanceDB, model cache, temp files, cleanup |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | FAQ and solutions |

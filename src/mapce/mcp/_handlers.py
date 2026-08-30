@@ -216,10 +216,18 @@ async def index_paper(
     elif source_type in ("local", "url"):
         pdf_path = Path(source).expanduser()
         if not pdf_path.exists():
-            return json.dumps({"status": "error", "message": f"File not found: {source}"})
+            return json.dumps({
+                "status": "error",
+                "error_code": "file_not_found",
+                "message": f"File not found: {source}",
+            })
         paper_id = _index_paper(pdf_path=pdf_path, language=language)
     else:
-        return json.dumps({"status": "error", "message": f"Unknown source_type: {source_type}"})
+        return json.dumps({
+            "status": "error",
+            "error_code": "invalid_source_type",
+            "message": f"Unknown source_type: {source_type}",
+        })
 
     db = get_connection()
     meta = get_meta(init_index_meta(db), paper_id) or {}
@@ -273,7 +281,10 @@ async def list_indexed_papers() -> str:
 
     db = get_connection()
     meta_table = init_index_meta(db)
-    papers = list_all_meta(meta_table)
+    papers = list_all_meta(meta_table, columns=[
+        "paper_id", "title", "authors", "arxiv_id", "indexed_at",
+        "chunk_count", "has_code", "code_indexed", "code_status", "status",
+    ])
 
     if not papers:
         return json.dumps({"status": "ok", "count": 0, "papers": []})
@@ -312,7 +323,11 @@ async def get_paper_overview(paper_id: str) -> str:
 
     overview = _get_overview(paper_id)
     if overview is None:
-        return json.dumps({"status": "error", "message": f"Paper not found: {paper_id}"})
+        return json.dumps({
+            "status": "error",
+            "error_code": "paper_not_found",
+            "message": f"Paper not found: {paper_id}",
+        })
 
     return json.dumps({"status": "ok", **overview}, ensure_ascii=False)
 
@@ -324,8 +339,18 @@ async def get_paper_overview(paper_id: str) -> str:
 async def delete_paper(paper_id: str) -> str:
     """Delete a paper and all its chunks."""
     from mapce.core.incremental import delete_paper_safe
+    from mapce.db import get_connection, get_meta, init_index_meta
 
-    summary = delete_paper_safe(paper_id)
+    db = get_connection()
+    meta = get_meta(init_index_meta(db), paper_id)
+    if meta is None or meta.get("status") == "deleted":
+        return json.dumps({
+            "status": "error",
+            "error_code": "paper_not_found",
+            "message": f"Paper not found: {paper_id}",
+        })
+
+    summary = delete_paper_safe(paper_id, db=db)
     return json.dumps({
         "status": "ok",
         **summary,
@@ -347,7 +372,10 @@ async def get_stats() -> str:
     chunks_table = init_chunks(db)
     meta_table = init_index_meta(db)
 
-    papers = list_all_meta(meta_table)
+    papers = list_all_meta(
+        meta_table,
+        columns=["paper_id", "code_indexed", "code_status", "status"],
+    )
     total_chunks = chunks_table.count_rows() if chunks_table else 0
     paper_chunks = chunks_table.count_rows("source_type = 'paper'") if chunks_table else 0
     code_chunks = chunks_table.count_rows("source_type = 'code'") if chunks_table else 0
@@ -369,3 +397,52 @@ async def get_stats() -> str:
         "code_chunks": code_chunks,
         "vector_index": index_report(chunks_table),
     }, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Agent paper reading
+# ---------------------------------------------------------------------------
+
+async def resolve_paper(identifier: str) -> str:
+    """Resolve an internal paper ID or arXiv reference without network access."""
+    from mapce.application.papers import resolve_paper as _resolve_paper
+
+    return json.dumps(_resolve_paper(identifier), ensure_ascii=False)
+
+
+async def read_paper_section(
+    paper_id: str,
+    section_path: str | None = None,
+    chunk_id: str | None = None,
+    include_subsections: bool = False,
+    limit: int = 10,
+    cursor: str | None = None,
+) -> str:
+    """Read stable, paginated paper content without embedding columns."""
+    from mapce.application.papers import read_paper_section as _read_paper_section
+
+    return json.dumps(
+        _read_paper_section(
+            paper_id,
+            section_path=section_path,
+            chunk_id=chunk_id,
+            include_subsections=include_subsections,
+            limit=limit,
+            cursor=cursor,
+        ),
+        ensure_ascii=False,
+    )
+
+
+async def search_paper_content(
+    paper_id: str,
+    query: str,
+    top_k: int = 10,
+) -> str:
+    """Search multiple relevant chunks inside one paper."""
+    from mapce.application.papers import search_paper_content as _search_paper_content
+
+    return json.dumps(
+        _search_paper_content(paper_id, query, top_k=top_k),
+        ensure_ascii=False,
+    )

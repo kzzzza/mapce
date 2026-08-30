@@ -883,7 +883,13 @@ def get_chunk_by_id(
     table = init_chunks(db)
 
     try:
-        rows = table.search().where(f"chunk_id = {sql_str(chunk_id)}").limit(1).to_list()
+        rows = (
+            table.search()
+            .where(f"chunk_id = {sql_str(chunk_id)}")
+            .select(_RESULT_COLUMNS)
+            .limit(1)
+            .to_list()
+        )
     except Exception:
         return None
 
@@ -910,13 +916,37 @@ def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) ->
     try:
         pid = sql_str(paper_id)
         # L1
-        l1_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'paper_l1'").limit(1).to_list()
+        l1_rows = (
+            table.search()
+            .where(f"paper_id = {pid} AND chunk_type = 'paper_l1'")
+            .select(["paper_id", "title", "authors", "year", "venue", "arxiv_id", "doi", "content"])
+            .limit(1)
+            .to_list()
+        )
         # L2 sections
-        l2_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'paper_l2'").to_list()
+        l2_rows = (
+            table.search()
+            .where(f"paper_id = {pid} AND chunk_type = 'paper_l2'")
+            .select(["chunk_id", "section_path", "chunk_index"])
+            .limit(1000)
+            .to_list()
+        )
         # Figures
-        fig_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'figure'").to_list()
+        fig_rows = (
+            table.search()
+            .where(f"paper_id = {pid} AND chunk_type = 'figure'")
+            .select(["chunk_id", "figure_index", "content", "chunk_index"])
+            .limit(1000)
+            .to_list()
+        )
         # Tables
-        tbl_rows = table.search().where(f"paper_id = {pid} AND chunk_type = 'table'").to_list()
+        tbl_rows = (
+            table.search()
+            .where(f"paper_id = {pid} AND chunk_type = 'table'")
+            .select(["chunk_id", "table_dims", "content", "chunk_index"])
+            .limit(1000)
+            .to_list()
+        )
     except Exception:
         return None
 
@@ -927,6 +957,9 @@ def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) ->
     from mapce.core.code_repositories import get_repository_associations
     meta = get_meta(init_index_meta(db), paper_id)
     repositories = get_repository_associations(paper_id, db)
+    l2_rows.sort(key=lambda row: (int(row.get("chunk_index") or 0), row["chunk_id"]))
+    fig_rows.sort(key=lambda row: (int(row.get("chunk_index") or 0), row["chunk_id"]))
+    tbl_rows.sort(key=lambda row: (int(row.get("chunk_index") or 0), row["chunk_id"]))
 
     return {
         "paper_id": paper_id,
