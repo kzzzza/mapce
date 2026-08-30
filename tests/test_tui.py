@@ -159,6 +159,32 @@ async def test_small_terminal_displays_warning_instead_of_tables():
 
 
 @pytest.mark.asyncio
+async def test_paper_inventory_renders_all_rows_in_one_scrollable_table():
+    client = FakeClient()
+    app = MapceTUI(client=client)
+    async with app.run_test(size=(120, 40)) as pilot:
+        app.query_one("#main-tabs", TabbedContent).active = "tab-papers"
+        await pilot.pause()
+        pane = app.query_one(PapersPane)
+        pane._set_rows(
+            [
+                {
+                    "paper_id": f"paper-{index:03d}",
+                    "title": f"Paper {index}",
+                    "status": "complete",
+                    "code_status": "no_code",
+                }
+                for index in range(75)
+            ]
+        )
+        table = app.query_one("#papers-table", DataTable)
+
+        assert table.row_count == 75
+        assert not app.query("#papers-prev")
+        assert not app.query("#papers-next")
+
+
+@pytest.mark.asyncio
 async def test_confirmed_paper_delete_submits_job_from_modal_worker():
     client = FakeClient()
     app = MapceTUI(client=client)

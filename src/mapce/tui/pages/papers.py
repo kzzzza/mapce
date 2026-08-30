@@ -17,13 +17,10 @@ from .common import ConfirmScreen
 
 
 class PapersPane(Vertical):
-    PAGE_SIZE = 20
-
     def __init__(self) -> None:
         super().__init__()
         self.rows: list[dict[str, Any]] = []
         self.rows_by_id: dict[str, dict[str, Any]] = {}
-        self.page = 0
         self.selected_paper_id: str | None = None
 
     def compose(self) -> ComposeResult:
@@ -47,10 +44,6 @@ class PapersPane(Vertical):
         with Horizontal(classes="split"):
             with Vertical(classes="split-left"):
                 yield DataTable(id="papers-table", cursor_type="row")
-                with Horizontal(classes="pager"):
-                    yield Button("上一页", id="papers-prev")
-                    yield Static("第 1 页", id="papers-page")
-                    yield Button("下一页", id="papers-next")
             with VerticalScroll(classes="split-right"):
                 yield Static("选择一篇论文查看摘要、章节目录、图表和仓库状态。", id="paper-detail")
                 yield Button("删除论文", id="paper-delete", variant="error", disabled=True)
@@ -91,15 +84,12 @@ class PapersPane(Vertical):
     def _set_rows(self, rows: list[dict[str, Any]]) -> None:
         self.rows = rows
         self.rows_by_id = {str(row.get("paper_id")): row for row in rows if row.get("paper_id")}
-        self.page = 0
-        self._render_page()
+        self._render_rows()
 
-    def _render_page(self) -> None:
+    def _render_rows(self) -> None:
         table = self.query_one("#papers-table", DataTable)
         table.clear()
-        start = self.page * self.PAGE_SIZE
-        page_rows = self.rows[start : start + self.PAGE_SIZE]
-        for row in page_rows:
+        for row in self.rows:
             paper_id = str(row.get("paper_id", ""))
             table.add_row(
                 paper_id,
@@ -109,10 +99,6 @@ class PapersPane(Vertical):
                 str(row.get("code_status") or ""),
                 key=paper_id,
             )
-        pages = max(1, (len(self.rows) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
-        self.query_one("#papers-page", Static).update(f"第 {self.page + 1}/{pages} 页 · {len(self.rows)} 篇")
-        self.query_one("#papers-prev", Button).disabled = self.page == 0
-        self.query_one("#papers-next", Button).disabled = self.page + 1 >= pages
 
     @work(exclusive=True, group="paper-list")
     async def load_all(self) -> None:
@@ -265,12 +251,5 @@ class PapersPane(Vertical):
                 self.exact_lookup()
             case "paper-semantic":
                 self.semantic_search()
-            case "papers-prev":
-                self.page = max(0, self.page - 1)
-                self._render_page()
-            case "papers-next":
-                if (self.page + 1) * self.PAGE_SIZE < len(self.rows):
-                    self.page += 1
-                    self._render_page()
             case "paper-delete":
                 self.delete_selected()

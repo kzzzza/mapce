@@ -122,16 +122,6 @@ DataTable {
     padding: 0 1;
 }
 
-.pager {
-    height: 3;
-    align-horizontal: center;
-}
-
-.pager Button {
-    min-width: 10;
-    margin: 0 1;
-}
-
 .form-box {
     background: #111c2b;
     border: round #263950;
