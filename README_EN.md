@@ -124,13 +124,14 @@ results, _ = search_code('self-attention transformer implementation')
 
 ## MAPCE TODO
 
-- [ ] **Code Analysis Enhancement**: Python AST parsing works decently, but C++/CUDA relies on regex hacks — template metaprogramming and complex macro expansion are basically unhandled. Need to support more languages (Makefile, Dockerfile, shell scripts, etc.)
-- [ ] **Retrieval Quality Optimization**: Chunking strategy heavily impacts retrieval — too coarse and results are imprecise, too fine and context is insufficient. Needs further iteration and testing.
-- [ ] **Auto-Update Mechanism**: Automatically detect new arXiv versions and new commits in code repos. Ideal setup: run on a personal server with a loop, detect changes, and notify the user via WeChat / Feishu to confirm syncing.
-- [ ] **Frontend UI**: Currently CLI + MCP only — convenient for agents but unfriendly for humans. Need a simple frontend for browsing indexed content.
-- [ ] **Deep Zotero Integration**: Go beyond just extracting PDFs — sync Zotero user notes into the database, or build a Zotero-integrated agent plugin.
+- [x] **Paper Retrieval Breadth and Memory Safety**: Added hybrid dense/full-text retrieval, paper-level deduplication, and best-evidence selection. IVF-PQ indexing, connection reuse, and opt-in embedding warmup reduce memory use from repeated searches and duplicate MCP processes.
+- [x] **Paper-to-Code Repository Associations**: Separated paper and code states, added multi-repository associations, official repository discovery, reviewable candidates, and an explicit state for papers where no repository was found.
+- [ ] **Code Retrieval Ranking**: The current code-file `Recall@5` baseline is approximately 0.65. Improve ranking with repository, file-path, symbol, and call-graph signals, backed by finer-grained evaluation sets for different languages.
+- [ ] **Code Analysis Enhancement**: Python uses AST parsing, while C++/CUDA still relies on regular expressions and cannot reliably handle template metaprogramming or complex macro expansion. Consider Tree-sitter or language-server integration, plus Makefile, Dockerfile, and shell support.
+- [ ] **Auto-Update Mechanism**: Detect new arXiv versions and repository commits, present changes for user confirmation, then apply incremental updates. Also refresh auxiliary indexes and retry failed jobs.
+- [ ] **Frontend UI**: The current interface is primarily MCP and CLI. Add a browser for papers, sections, figures, repository associations, and indexing states.
+- [ ] **Deep Zotero Integration**: Go beyond PDF import by syncing Zotero notes, tags, and collections, or provide a Zotero Agent plugin.
 
 ## License
 
 [MIT](LICENSE)
-
