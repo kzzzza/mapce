@@ -283,6 +283,7 @@ async def list_indexed_papers() -> str:
             {
                 "paper_id": p["paper_id"],
                 "title": p["title"][:100],
+                "authors": p.get("authors") or [],
                 "arxiv_id": p.get("arxiv_id"),
                 "indexed_at": p["indexed_at"],
                 "chunk_count": p["chunk_count"],
@@ -346,6 +347,8 @@ async def get_stats() -> str:
 
     papers = list_all_meta(meta_table)
     total_chunks = chunks_table.count_rows() if chunks_table else 0
+    paper_chunks = chunks_table.count_rows("source_type = 'paper'") if chunks_table else 0
+    code_chunks = chunks_table.count_rows("source_type = 'code'") if chunks_table else 0
     papers_with_code = sum(1 for p in papers if p.get("code_indexed"))
     code_status_counts: dict[str, int] = {}
     for paper in papers:
@@ -360,5 +363,7 @@ async def get_stats() -> str:
         "papers_with_code": papers_with_code,
         "code_status_distribution": code_status_counts,
         "total_chunks": total_chunks,
+        "paper_chunks": paper_chunks,
+        "code_chunks": code_chunks,
         "vector_index": index_report(chunks_table),
     }, ensure_ascii=False)

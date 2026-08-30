@@ -131,8 +131,14 @@ def run() -> dict:
     papers_with_l1 = {paper_id[i] for i in l1_idx}
     all_paper_ids = {m["paper_id"] for m in meta}
     missing_l1 = sorted(all_paper_ids - papers_with_l1)
-    # actual chunk count per paper vs index_meta.chunk_count
-    actual_counts = collections.Counter(paper_id)
+    # index_meta.chunk_count records paper chunks only. Code chunks are tracked
+    # separately because one paper can own one or more large repositories.
+    actual_counts = collections.Counter(
+        pid for pid, source in zip(paper_id, source_type) if source == "paper"
+    )
+    code_counts = collections.Counter(
+        pid for pid, source in zip(paper_id, source_type) if source == "code"
+    )
     count_mismatch = []
     for m in meta:
         pid = m["paper_id"]
@@ -147,6 +153,8 @@ def run() -> dict:
             "papers_missing_l1": len(missing_l1),
             "missing_l1_ids": missing_l1[:20],
             "chunk_count_mismatch": len(count_mismatch),
+            "paper_chunk_count": sum(actual_counts.values()),
+            "code_chunk_count": sum(code_counts.values()),
             "l1": ct_counts.get("paper_l1", 0),
             "l2": ct_counts.get("paper_l2", 0),
             "l3": ct_counts.get("paper_l3", 0),

@@ -30,6 +30,7 @@ def main():
     from mapce.db.connection import get_connection
     from mapce.db.operations import (
         ensure_index_meta_code_columns,
+        ensure_index_meta_metadata_columns,
         init_chunks,
         init_code_repos,
         init_mapping,
@@ -40,7 +41,8 @@ def main():
     init_chunks(db)
     init_mapping(db)
     init_code_repos(db)
-    ensure_index_meta_code_columns(init_index_meta(db))
+    meta_table = ensure_index_meta_code_columns(init_index_meta(db))
+    ensure_index_meta_metadata_columns(meta_table)
     print(f"  ✓ chunks, paper_code_mapping, paper_code_repos, index_meta ready")
 
     # 2. Embedding model (warm-up download)

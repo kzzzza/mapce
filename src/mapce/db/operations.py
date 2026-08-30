@@ -203,6 +203,17 @@ def ensure_index_meta_code_columns(table: Any) -> Any:
     return table
 
 
+def ensure_index_meta_metadata_columns(table: Any) -> Any:
+    """Add structured paper-metadata columns to a legacy index_meta table."""
+    if "authors" not in set(table.schema.names):
+        # Lance/DataFusion cannot CAST directly to a list type. Build a typed
+        # one-item list and slice it to an empty list instead.
+        table.add_columns({
+            "authors": "array_slice(make_array(CAST(NULL AS STRING)), 1, 0)"
+        })
+    return table
+
+
 def upsert_meta(table: Any, row: dict[str, Any]) -> None:
     """Insert or update index metadata for a paper."""
     # LanceDB doesn't have native upsert; delete-then-insert

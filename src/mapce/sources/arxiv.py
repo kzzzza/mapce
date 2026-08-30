@@ -9,6 +9,8 @@ Supports:
 from __future__ import annotations
 
 import json
+import re
+import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -35,7 +37,15 @@ class ArxivPaper:
 # arXiv API (free, no key required, rate-limited)
 # ---------------------------------------------------------------------------
 
-ARXIV_API = "http://export.arxiv.org/api/query"
+ARXIV_API = "https://export.arxiv.org/api/query"
+
+
+def _request_arxiv(params: dict[str, Any]) -> list[ArxivPaper]:
+    url = f"{ARXIV_API}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "MAPCE/0.1"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        raw = resp.read().decode("utf-8")
+    return _parse_arxiv_response(raw)
 
 
 def search_arxiv(
@@ -53,26 +63,49 @@ def search_arxiv(
     Returns:
         List of ArxivPaper metadata objects.
     """
-    params = urllib.parse.urlencode({
+    return _request_arxiv({
         "search_query": query,
         "start": start,
         "max_results": max_results,
         "sortBy": "submittedDate",
         "sortOrder": "descending",
     })
-    url = f"{ARXIV_API}?{params}"
-
-    req = urllib.request.Request(url, headers={"User-Agent": "MAPCE/0.1"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        raw = resp.read().decode("utf-8")
-
-    return _parse_arxiv_response(raw)
 
 
 def get_arxiv_metadata(arxiv_id: str) -> ArxivPaper | None:
     """Fetch metadata for a single arXiv paper by ID."""
     results = search_arxiv(f"id:{arxiv_id}", max_results=1)
     return results[0] if results else None
+
+
+def get_arxiv_metadata_batch(
+    arxiv_ids: list[str],
+    batch_size: int = 25,
+    delay_seconds: float = 3.0,
+) -> dict[str, ArxivPaper]:
+    """Fetch metadata by ID in bounded batches.
+
+    The arXiv API accepts ``id_list`` and may return entries in a different
+    order, so results are keyed by their normalized arXiv ID.
+    """
+    unique_ids = list(dict.fromkeys(
+        re.sub(r"v\d+$", "", arxiv_id.strip())
+        for arxiv_id in arxiv_ids
+        if arxiv_id and arxiv_id.strip()
+    ))
+    results: dict[str, ArxivPaper] = {}
+    starts = range(0, len(unique_ids), max(1, batch_size))
+    for batch_index, start in enumerate(starts):
+        if batch_index and delay_seconds > 0:
+            time.sleep(delay_seconds)
+        batch = unique_ids[start:start + max(1, batch_size)]
+        papers = _request_arxiv({
+            "id_list": ",".join(batch),
+            "start": 0,
+            "max_results": len(batch),
+        })
+        results.update({paper.arxiv_id: paper for paper in papers})
+    return results
 
 
 def download_arxiv_pdf(arxiv_id: str, output_dir: Path) -> Path:
@@ -110,7 +143,10 @@ def _parse_arxiv_response(xml_str: str) -> list[ArxivPaper]:
         arxiv_id = entry.find("atom:id", ns)
         arxiv_id_text = arxiv_id.text.strip() if arxiv_id is not None else ""
         # Extract ID from URL: http://arxiv.org/abs/2301.12345v1 → 2301.12345
-        arxiv_id_clean = arxiv_id_text.split("/")[-1].split("v")[0] if arxiv_id_text else ""
+        arxiv_id_clean = (
+            re.sub(r"v\d+$", "", arxiv_id_text.split("/")[-1])
+            if arxiv_id_text else ""
+        )
 
         title = entry.find("atom:title", ns)
         title_text = title.text.strip().replace("\n", " ") if title is not None else ""

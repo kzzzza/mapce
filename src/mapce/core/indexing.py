@@ -14,8 +14,10 @@ from typing import Any, Callable
 
 from mapce.core.chunking.paper import chunk_paper
 from mapce.core.embedding import embed, embed_single
+from mapce.mineru.api import batch_parse
 from mapce.db import (
     ensure_index_meta_code_columns,
+    ensure_index_meta_metadata_columns,
     get_connection,
     init_chunks,
     init_index_meta,
@@ -23,7 +25,35 @@ from mapce.db import (
     sql_str,
     upsert_meta,
 )
-from mapce.mineru.api import batch_parse
+
+
+_ARXIV_ID_RE = re.compile(r"^(?:arxiv[:\s_-]*)?\d{4}\.\d{4,5}(?:v\d+)?$", re.IGNORECASE)
+
+
+def _is_placeholder_title(title: str | None, *identifiers: str | None) -> bool:
+    """Return whether a title is empty or merely repeats a storage identifier."""
+    normalized = (title or "").strip()
+    if not normalized or normalized.lower() in {"untitled", "unknown"}:
+        return True
+    if _ARXIV_ID_RE.fullmatch(normalized):
+        return True
+    folded = normalized.casefold()
+    return any(
+        folded == (value or "").strip().casefold()
+        for value in identifiers
+        if value
+    )
+
+
+def _first_markdown_title(markdown: str) -> str | None:
+    """Find the first H1 title even when images or notices precede it."""
+    for line in markdown.splitlines():
+        match = re.match(r"^\s*#(?!#)\s+(.+?)\s*$", line)
+        if match:
+            candidate = match.group(1).strip()
+            if candidate:
+                return candidate
+    return None
 
 
 def _get_paper_cache_dir(paper_id: str) -> Path:
@@ -67,9 +97,7 @@ def _extract_metadata_from_mineru(paper_dir: Path, pdf_path: Path) -> dict[str, 
     title = ""
     try:
         md = mineru.read_markdown()
-        lines = md.strip().split("\n")
-        if lines and lines[0].startswith("#"):
-            title = lines[0].lstrip("#").strip()
+        title = _first_markdown_title(md) or ""
     except Exception:
         pass
 
@@ -100,7 +128,7 @@ def _enrich_metadata_from_arxiv(metadata: dict[str, Any]) -> dict[str, Any]:
     if arxiv_meta is None:
         return metadata
     enriched = dict(metadata)
-    if not enriched.get("title") or enriched.get("title") == arxiv_id:
+    if _is_placeholder_title(enriched.get("title"), str(arxiv_id)):
         enriched["title"] = arxiv_meta.title or enriched.get("title")
     if not enriched.get("authors"):
         enriched["authors"] = arxiv_meta.authors
@@ -194,6 +222,7 @@ def _index_from_mineru_dir(
     chunks_table = init_chunks(db)
     meta_table = init_index_meta(db)
     ensure_index_meta_code_columns(meta_table)
+    ensure_index_meta_metadata_columns(meta_table)
 
     if on_progress:
         on_progress("chunking", {"status": "chunking"})
@@ -228,6 +257,7 @@ def _index_from_mineru_dir(
     upsert_meta(meta_table, {
         "paper_id": paper_id,
         "title": title,
+        "authors": metadata.get("authors") or [],
         "arxiv_id": metadata.get("arxiv_id"),
         "doi": metadata.get("doi"),
         "title_embedding": title_embedding,
@@ -417,9 +447,9 @@ def index_paper_from_arxiv(
     try:
         mineru = MinerUOutput(paper_dir)
         md = mineru.read_markdown()
-        lines = md.strip().split("\n")
-        if metadata["title"] == arxiv_id and lines and lines[0].startswith("#"):
-            metadata["title"] = lines[0].lstrip("#").strip()
+        local_title = _first_markdown_title(md)
+        if _is_placeholder_title(metadata.get("title"), arxiv_id) and local_title:
+            metadata["title"] = local_title
     except Exception:
         pass
 

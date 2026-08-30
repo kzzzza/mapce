@@ -111,12 +111,13 @@ CODE_REPOS_SCHEMA = pa.schema([
 INDEX_META_SCHEMA = pa.schema([
     pa.field("paper_id", pa.string(), nullable=False),
     pa.field("title", pa.string(), nullable=False),
+    pa.field("authors", pa.list_(pa.string()), nullable=True),
     pa.field("arxiv_id", pa.string(), nullable=True),
     pa.field("doi", pa.string(), nullable=True),
     pa.field("title_embedding", pa.list_(pa.float32(), list_size=1024), nullable=True),
     pa.field("indexed_at", pa.string(), nullable=False),       # ISO timestamp
     pa.field("parser_version", pa.string(), nullable=True),
-    pa.field("chunk_count", pa.int32(), nullable=False),
+    pa.field("chunk_count", pa.int32(), nullable=False),  # paper chunks only
     pa.field("has_code", pa.bool_(), nullable=False),
     pa.field("code_repo_url", pa.string(), nullable=True),
     pa.field("code_indexed", pa.bool_(), nullable=False),
