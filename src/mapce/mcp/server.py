@@ -1,63 +1,36 @@
-"""MCP Server entry point for MAPCE.
-
-Start with:
-    python -m mapce.mcp.server
-
-Configure in Claude Code settings.local.json:
-    {
-      "mcpServers": {
-        "mapce": {
-          "command": "uv",
-          "args": ["run", "--directory", "/path/to/mapce", "python", "-m", "mapce.mcp.server"]
-        }
-      }
-    }
-"""
+"""Backward-compatible stdio MCP proxy for the singleton MAPCE service."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
-from .tools import TOOL_DEFINITIONS, HANDLERS
+from mapce.client import MapceClient, ServiceClientError
 
-logger = logging.getLogger("mapce.mcp")
+from .tools import TOOL_DEFINITIONS
 
-
-@asynccontextmanager
-async def mapce_lifespan(server: Server):
-    """Start the server, optionally warming the embedding model."""
-    logger.info("MAPCE MCP Server starting up...")
-    warmup = os.environ.get("MAPCE_WARMUP_EMBEDDING", "0").lower() in {
-        "1", "true", "yes", "on",
-    }
-    if warmup:
-        try:
-            from mapce.core.embedding import embed_single
-            _ = embed_single("startup warmup")
-            logger.info("Embedding model loaded.")
-        except Exception as e:
-            logger.warning(
-                "Embedding model warm-up failed (will load on first use): %s", e
-            )
-    else:
-        logger.info("Embedding model warm-up disabled; model will load on demand.")
-    try:
-        yield
-    finally:
-        logger.info("MAPCE MCP Server shutting down.")
+logger = logging.getLogger("mapce.mcp.proxy")
 
 
 def create_server() -> Server:
-    """Create and configure the MCP Server with all MAPCE tools."""
-    server = Server("mapce", lifespan=mapce_lifespan)
+    """Create the lightweight stdio proxy without importing database modules."""
+    client = MapceClient(auto_start=True)
+
+    @asynccontextmanager
+    async def proxy_lifespan(_: Server):
+        client.connect()
+        try:
+            yield {"client": client}
+        finally:
+            client.close()
+
+    server = Server("mapce", lifespan=proxy_lifespan)
 
     @server.list_tools()
     async def handle_list_tools() -> list[Tool]:
@@ -65,28 +38,27 @@ def create_server() -> Server:
 
     @server.call_tool()
     async def handle_call_tool(name: str, arguments: dict) -> list[TextContent]:
-        if name not in HANDLERS:
-            raise ValueError(f"Unknown tool: {name}")
-        handler = HANDLERS[name]
         try:
-            result = await handler(**arguments)
-        except Exception as e:
-            logger.exception(f"Tool '{name}' failed")
-            result = json.dumps({"status": "error", "message": str(e)})
-        return [TextContent(type="text", text=result)]
+            result = await client.call_tool_async(name, arguments)
+        except ServiceClientError as exc:
+            result = {
+                "status": "error",
+                "error_code": exc.error_code,
+                "message": str(exc),
+            }
+        return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]
 
     return server
 
 
-def main():
-    """Run the MCP server over stdio."""
+def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
     server = create_server()
 
-    async def run():
+    async def run() -> None:
         async with stdio_server() as (reader, writer):
             await server.run(reader, writer, server.create_initialization_options())
 

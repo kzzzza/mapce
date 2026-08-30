@@ -2,7 +2,7 @@
 
 # Usage
 
-MAPCE can be used via Python SDK or Claude Code natural language interaction. Both share the same set of MCP tools.
+MAPCE can be used via the Python SDK or Claude Code natural language interaction. MCP, the CLI, and the planned TUI share one local background service; the Python SDK remains available for development and maintenance scripts.
 
 ## Python SDK
 
@@ -155,9 +155,15 @@ Create `.mcp.json` in the project root:
 }
 ```
 
-Replace `/path/to/mapce` with the actual path. Restart Claude Code, approve the server, and all tools above become available.
+Replace `/path/to/mapce` with the actual path. Restart Claude Code, approve the server, and all tools above become available. The stdio entry point only forwards requests and does not load LanceDB or the embedding model; clients using the same `MAPCE_DATA_DIR` reuse one service.
 
 ```bash
-# Run standalone for debugging
+# Service management
+uv run mapce serve
+uv run mapce serve-status
+uv run mapce serve-logs
+uv run mapce serve-kill
+
+# Debug the stdio proxy
 uv run python -m mapce.mcp.server
 ```

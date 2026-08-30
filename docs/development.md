@@ -45,12 +45,19 @@ mapce/
 │   │   ├── schema.py            # PyArrow Schema
 │   │   └── operations.py        # CRUD
 │   │
+│   ├── contracts/               # HTTP、任务和错误响应模型
+│   ├── application/             # 工具调度与串行写任务队列
+│   ├── service/                 # 单实例锁、HTTP 服务和进程生命周期
+│   ├── client/                  # CLI、TUI 与 stdio 代理共用的 HTTP 客户端
+│   ├── cli.py                   # 服务管理命令入口
+│   │
 │   ├── mineru/                  # MinerU API 封装
 │   │   ├── api.py               # httpx 实现
 │   │   └── parser.py            # 输出解析
 │   │
-│   ├── mcp/                     # MCP Server 层
-│   │   ├── server.py            # stdio 入口
+│   ├── mcp/                     # MCP 传输适配层
+│   │   ├── server.py            # 轻量 stdio HTTP 代理
+│   │   ├── backend.py           # 后台服务内的 Streamable HTTP MCP
 │   │   ├── tools.py             # 工具定义
 │   │   └── _handlers.py         # 异步 handler
 │   │
@@ -62,6 +69,8 @@ mapce/
 │
 └── tests/
 ```
+
+生产环境中，同一个规范化 `MAPCE_DATA_DIR` 由一个后台服务持有。服务使用生命周期 `flock` 防止重复实例，并集中管理 LanceDB、按需加载的嵌入模型与串行写任务。CLI 和 stdio MCP 代理只通过本地 HTTP 客户端访问服务，导入时不会加载数据库或模型。
 
 ### 索引流水线
 

@@ -48,3 +48,11 @@ instead of CLS embedding.
 ```
 
 This is a normal model version change notice. Current functionality is unaffected. To exactly reproduce old behavior, install `fastembed==0.5.1`.
+
+## `service_port_in_use`
+
+Another process is using the default `127.0.0.1:8765` endpoint. Run `uv run mapce serve-status` first. If no verified MAPCE service is present, inspect the process using the port or choose another port with `MAPCE_SERVICE_PORT`. MAPCE does not terminate processes whose identity it cannot verify.
+
+## Stale Service Metadata
+
+A forced termination can briefly leave `service.json` behind, while the operating system still releases the `flock` when the process exits. The next `mapce serve` rewrites runtime metadata after acquiring the lock. Do not terminate an unrelated process based only on a stale PID.

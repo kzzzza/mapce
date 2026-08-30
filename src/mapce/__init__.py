@@ -11,4 +11,6 @@ import os
 # allocation in CLI, test, and MCP entry points alike.
 os.environ.setdefault("LANCE_INCLUDE_VECTOR_CENTROIDS", "false")
 
-__all__ = []
+__version__ = "0.1.0"
+
+__all__ = ["__version__"]

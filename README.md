@@ -46,6 +46,8 @@ uv run --env-file .env python scripts/init_db.py
 | `MAPCE_DATA_DIR` | `~/.mapce/data` | LanceDB 数据目录 |
 | `MAPCE_EMBEDDING_MODEL` | `intfloat/multilingual-e5-large` | 嵌入模型（fastembed） |
 | `MAPCE_EMBEDDING_CACHE_DIR` | `$MAPCE_DATA_DIR/models/fastembed` | 嵌入模型持久缓存目录 |
+| `MAPCE_SERVICE_PORT` | `8765` | 本地单实例后台服务端口，仅监听 `127.0.0.1` |
+| `MAPCE_WARMUP_EMBEDDING` | `0` | 是否在服务启动时预加载嵌入模型；默认按需加载 |
 | `MAPCE_LOG_LEVEL` | `INFO` | 日志级别 |
 | `http_proxy` / `https_proxy` | — | HTTP 代理（国内必填） |
 
@@ -68,6 +70,8 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 ```
 
 ## 接入 Claude Code
+
+MAPCE 通过一个本地后台服务集中持有 LanceDB 连接和嵌入模型。同一个 `MAPCE_DATA_DIR` 只运行一个服务；Claude Code 启动的 stdio 进程是轻量代理，会自动启动或复用后台服务。原有 MCP 配置不需要改变。
 
 在项目根目录创建 `.mcp.json`：
 
@@ -94,6 +98,18 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 > 这篇论文有对应的开源代码吗？帮我索引
 >
 > 检索 transformer 架构中关于 attention 机制的相关论文和代码
+
+### 后台服务管理
+
+```bash
+uv run --env-file .env mapce serve          # 启动或复用后台服务
+uv run --env-file .env mapce serve-status   # 查看 PID、端口和模型加载状态
+uv run --env-file .env mapce serve-logs     # 查看日志路径
+uv run --env-file .env mapce serve-kill     # 在安全点正常停止
+uv run --env-file .env mapce serve-restart  # 重启服务
+```
+
+退出 MCP 客户端不会停止后台服务。只有 `serve-kill` 会请求停止；`serve-kill --force` 只用于已经通过健康检查验证身份的准确进程。
 
 ## 文档索引
 

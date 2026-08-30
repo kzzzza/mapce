@@ -31,6 +31,10 @@ if _dotenv.exists():
 def main(apply: bool) -> None:
     from mapce.db import get_connection, init_chunks
     from mapce.db.operations import delete_chunks_by_repo_name, insert_chunks
+    from mapce.service.runtime import assert_database_write_allowed
+
+    if apply:
+        assert_database_write_allowed()
 
     db = get_connection()
     table = init_chunks(db)

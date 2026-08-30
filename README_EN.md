@@ -45,6 +45,9 @@ uv run --env-file .env python scripts/init_db.py
 | `MINERU_API_TOKEN` | — | **Required**. MinerU API key |
 | `MAPCE_DATA_DIR` | `~/.mapce/data` | LanceDB data directory |
 | `MAPCE_EMBEDDING_MODEL` | `intfloat/multilingual-e5-large` | Embedding model (fastembed) |
+| `MAPCE_EMBEDDING_CACHE_DIR` | `$MAPCE_DATA_DIR/models/fastembed` | Persistent embedding model cache |
+| `MAPCE_SERVICE_PORT` | `8765` | Local singleton service port, bound only to `127.0.0.1` |
+| `MAPCE_WARMUP_EMBEDDING` | `0` | Load the embedding model at startup; disabled for lazy loading by default |
 | `MAPCE_LOG_LEVEL` | `INFO` | Log level |
 | `http_proxy` / `https_proxy` | — | HTTP proxy (required for mainland China) |
 
@@ -67,6 +70,8 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 ```
 
 ## Claude Code Integration
+
+MAPCE now keeps its LanceDB connection and embedding model in one local background service. One service is allowed per `MAPCE_DATA_DIR`; the stdio process started by Claude Code is a lightweight proxy that starts or reuses that service. Existing MCP configuration remains valid.
 
 Create `.mcp.json` in the project root:
 
@@ -93,6 +98,18 @@ Replace `/path/to/mapce` with the actual path. Restart Claude Code, approve the 
 > Does this paper have open-source code? Index it for me
 >
 > Find papers and code about attention mechanisms in transformer architectures
+
+### Background Service Management
+
+```bash
+uv run --env-file .env mapce serve
+uv run --env-file .env mapce serve-status
+uv run --env-file .env mapce serve-logs
+uv run --env-file .env mapce serve-kill
+uv run --env-file .env mapce serve-restart
+```
+
+Closing an MCP client leaves the background service running. `serve-kill` requests a graceful shutdown; `serve-kill --force` only targets the exact process whose identity passed the service health check.
 
 ## Python SDK Quickstart
 

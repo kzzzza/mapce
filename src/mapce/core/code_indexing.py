@@ -96,6 +96,9 @@ def index_code_repository(
     Paper existence is checked before association writes or network access.
     Paper chunks and paper indexing status are never rolled back on code errors.
     """
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
     if db is None:
         db = get_connection()
 

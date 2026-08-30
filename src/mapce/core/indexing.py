@@ -162,6 +162,9 @@ def index_paper(
     Returns:
         The paper_id of the indexed paper.
     """
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
     # Preliminary paper_id (from the pdf stem) used for the cache dir name and
     # to detect whether the final paper_id changed. Defined on both branches so
     # the comparison below never hits an unbound name.
@@ -218,6 +221,9 @@ def _index_from_mineru_dir(
     Shared by index_paper (local PDF via batch_parse) and
     index_paper_from_arxiv (URL-based via parse_from_url).
     """
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
     db = get_connection()
     chunks_table = init_chunks(db)
     meta_table = init_index_meta(db)
@@ -405,6 +411,9 @@ def index_paper_from_arxiv(
     Returns:
         The paper_id of the indexed paper.
     """
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
     from mapce.mineru.api import parse_from_url
     from mapce.mineru.parser import MinerUOutput
 

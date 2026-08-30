@@ -65,6 +65,10 @@ def _maps_for_paper(paper_dir: Path):
 def main(apply: bool) -> None:
     from mapce.db import get_connection, init_chunks, sql_str
     from mapce.db.connection import _get_data_dir
+    from mapce.service.runtime import assert_database_write_allowed
+
+    if apply:
+        assert_database_write_allowed()
 
     db = get_connection()
     table = init_chunks(db)

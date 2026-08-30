@@ -45,12 +45,19 @@ mapce/
 │   │   ├── schema.py            # PyArrow schemas
 │   │   └── operations.py        # CRUD
 │   │
+│   ├── contracts/               # HTTP, job, and error response models
+│   ├── application/             # Tool dispatch and serialized write jobs
+│   ├── service/                 # Singleton lock, HTTP service, process lifecycle
+│   ├── client/                  # Shared HTTP client for CLI, TUI, and stdio proxy
+│   ├── cli.py                   # Service management entry point
+│   │
 │   ├── mineru/                  # MinerU API wrapper
 │   │   ├── api.py               # httpx implementation
 │   │   └── parser.py            # Output parser
 │   │
-│   ├── mcp/                     # MCP Server layer
-│   │   ├── server.py            # stdio entry point
+│   ├── mcp/                     # MCP transport adapters
+│   │   ├── server.py            # Lightweight stdio HTTP proxy
+│   │   ├── backend.py           # Streamable HTTP MCP inside the service
 │   │   ├── tools.py             # Tool definitions
 │   │   └── _handlers.py         # Async handlers
 │   │
@@ -62,6 +69,8 @@ mapce/
 │
 └── tests/
 ```
+
+In production, one background service owns each normalized `MAPCE_DATA_DIR`. A lifetime `flock` prevents duplicate instances, while the service centralizes LanceDB, the lazily loaded embedding model, and serialized write jobs. The CLI and stdio MCP proxy use the local HTTP client and do not load the database or model when imported.
 
 ### Indexing Pipeline
 

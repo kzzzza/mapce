@@ -51,6 +51,10 @@ def main() -> int:
         if args.data_dir
         else None
     )
+    if args.apply:
+        from mapce.service.runtime import assert_database_write_allowed
+
+        assert_database_write_allowed(data_dir)
     db = get_connection(data_dir)
     try:
         table = db.open_table("chunks")

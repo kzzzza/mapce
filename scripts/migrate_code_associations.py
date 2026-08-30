@@ -168,6 +168,10 @@ def main() -> int:
     args = parser.parse_args()
 
     data_dir = (args.data_dir or _get_data_dir()).expanduser().resolve()
+    if args.apply:
+        from mapce.service.runtime import assert_database_write_allowed
+
+        assert_database_write_allowed(data_dir)
     if not data_dir.exists():
         parser.error(f"Database directory does not exist: {data_dir}")
     db = lancedb.connect(str(data_dir))

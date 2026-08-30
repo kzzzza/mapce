@@ -48,3 +48,11 @@ instead of CLS embedding.
 ```
 
 这是正常的模型版本变更提示。当前功能不受影响。如需精确复现旧行为，可安装 `fastembed==0.5.1`。
+
+## `service_port_in_use`
+
+默认端口 `127.0.0.1:8765` 被其他进程占用。先运行 `uv run mapce serve-status`；如果没有可验证的 MAPCE 服务，检查占用端口的进程，或通过 `MAPCE_SERVICE_PORT` 选择其他端口。MAPCE 不会终止无法验证身份的进程。
+
+## 服务元数据残留
+
+服务被强制终止后可能短暂留下 `service.json`，但进程退出时内核会释放 `flock`。下一次 `mapce serve` 会在获得锁后重新写入运行信息。不要根据残留 PID 手动结束同 PID 的其他进程。

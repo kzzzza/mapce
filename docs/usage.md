@@ -2,7 +2,7 @@
 
 # 使用方法
 
-可以通过 Python SDK 直接调用，或通过 Claude Code 自然语言交互。两种方式共享同一套 MCP 工具。
+可以通过 Python SDK 直接调用，或通过 Claude Code 自然语言交互。MCP、命令行和后续 TUI 共用一个本地后台服务；Python SDK 仍可用于开发与维护脚本。
 
 ## Python SDK
 
@@ -155,9 +155,15 @@ print(asyncio.run(list_indexed_papers()))
 }
 ```
 
-`/path/to/mapce` 替换为实际路径。重启 Claude Code、批准服务器后即可直接用自然语言调用上述所有工具。
+`/path/to/mapce` 替换为实际路径。重启 Claude Code、批准服务器后即可直接用自然语言调用上述所有工具。stdio 入口只转发请求，不加载 LanceDB 和嵌入模型；同一个 `MAPCE_DATA_DIR` 的客户端会复用唯一后台服务。
 
 ```bash
-# 独立启动调试
+# 服务管理
+uv run mapce serve
+uv run mapce serve-status
+uv run mapce serve-logs
+uv run mapce serve-kill
+
+# 调试 stdio 代理
 uv run python -m mapce.mcp.server
 ```

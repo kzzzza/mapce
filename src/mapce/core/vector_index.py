@@ -150,6 +150,9 @@ def create_vector_indices(
     This builds auxiliary index files from stored vectors; it never recomputes
     embeddings or rewrites chunk content.
     """
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
     existing = _indices_by_name(table)
     config = vector_index_config()
     if VECTOR_INDEX_NAME not in existing or replace:
@@ -191,6 +194,9 @@ def create_vector_indices(
 
 def refresh_vector_indices(table: Any) -> dict[str, Any]:
     """Add appended rows to existing indices when coverage is incomplete."""
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
     report = index_report(table)
     if not report["vector_index_present"]:
         return report

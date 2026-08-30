@@ -253,6 +253,9 @@ def delete_paper_safe(
     Returns:
         Summary dict of what was deleted.
     """
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
     if db is None:
         db = get_connection()
 
