@@ -13,6 +13,13 @@ from rich.console import Console
 from rich.table import Table
 
 from mapce.client import MapceClient, ServiceClientError
+from mapce.configuration import (
+    ConfigurationError,
+    env_file_status,
+    load_configured_env,
+    set_default_env_file,
+    unset_default_env_file,
+)
 from mapce.service.process import (
     ServiceProcessError,
     ensure_service,
@@ -30,10 +37,12 @@ papers_app = typer.Typer(help="Find, inspect, and delete indexed papers.")
 search_app = typer.Typer(help="Search papers or content inside one paper.")
 index_app = typer.Typer(help="Submit paper and code indexing jobs.")
 jobs_app = typer.Typer(help="Inspect and cancel background jobs.")
+config_app = typer.Typer(help="Manage persistent MAPCE user configuration.")
 app.add_typer(papers_app, name="papers")
 app.add_typer(search_app, name="search")
 app.add_typer(index_app, name="index")
 app.add_typer(jobs_app, name="jobs")
+app.add_typer(config_app, name="config")
 
 console = Console()
 error_console = Console(stderr=True)
@@ -99,11 +108,60 @@ def root(
     data_dir: Path | None = typer.Option(None, "--data-dir", help="Override MAPCE_DATA_DIR."),
 ) -> None:
     """Open the database manager when no subcommand is given."""
+    if ctx.invoked_subcommand != "config":
+        try:
+            load_configured_env(strict=True)
+        except ConfigurationError as exc:
+            _fail(exc)
     ctx.obj = CLIState(data_dir.expanduser() if data_dir else None)
     if ctx.invoked_subcommand is None:
         from mapce.tui.app import MapceTUI
 
         MapceTUI(data_dir=ctx.obj.data_dir).run()
+
+
+@config_app.command("set-env")
+def config_set_env(env_file: Path) -> None:
+    """Save the default .env path used by every MAPCE entry point."""
+    try:
+        status = set_default_env_file(env_file)
+    except ConfigurationError as exc:
+        _fail(exc)
+    _emit(
+        {
+            "status": "ok",
+            **status.as_dict(),
+            "message": "Default MAPCE env file saved; its values were not copied.",
+        },
+        True,
+    )
+
+
+@config_app.command("show")
+def config_show() -> None:
+    """Show the effective env-file path without displaying secret values."""
+    try:
+        status = env_file_status()
+    except ConfigurationError as exc:
+        _fail(exc)
+    _emit({"status": "ok", **status.as_dict()}, True)
+
+
+@config_app.command("unset-env")
+def config_unset_env() -> None:
+    """Remove the saved default .env path."""
+    try:
+        status = unset_default_env_file()
+    except ConfigurationError as exc:
+        _fail(exc)
+    _emit(
+        {
+            "status": "ok",
+            **status.as_dict(),
+            "message": "Saved MAPCE env-file path removed.",
+        },
+        True,
+    )
 
 
 @app.command("serve")

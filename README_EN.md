@@ -36,6 +36,19 @@ cp .env.example .env
 
 # 4. Initialize database and download embedding model (first run only, ~2.1 GB)
 uv run --env-file .env python scripts/init_db.py
+
+# 5. Install the global tool and save the default .env path
+uv tool install .
+uv tool update-shell  # Only needed if mapce is not yet on PATH
+mapce config set-env "$(pwd)/.env"
+```
+
+After opening a new shell, run `mapce` from any directory. `uv tool install` uses an isolated tool environment and cannot infer the project `.env`; `config set-env` stores only its absolute path in `~/.mapce/config.json`, without copying or displaying secrets.
+
+```bash
+mapce config show
+mapce config unset-env
+uv tool install --reinstall .  # Update the global installation from the project directory
 ```
 
 ### .env Environment Variables
@@ -51,6 +64,8 @@ uv run --env-file .env python scripts/init_db.py
 | `MAPCE_LOG_LEVEL` | `INFO` | Log level |
 | `http_proxy` / `https_proxy` | — | HTTP proxy (required for mainland China) |
 
+Variables already set in the process take precedence over `.env`. For advanced use, `MAPCE_ENV_FILE` temporarily overrides the saved dotenv path, while `MAPCE_CONFIG_FILE` overrides the config location (default: `~/.mapce/config.json`).
+
 ### Proxy Configuration (mainland China users)
 
 Edit `.env` and uncomment:
@@ -60,7 +75,7 @@ http_proxy=http://127.0.0.1:9674
 https_proxy=http://127.0.0.1:9674
 ```
 
-`uv run --env-file .env` and the MCP Server's `--env-file` flag load these automatically. No manual `export` needed.
+After saving the default path, `mapce`, `mapce-mcp`, and the background service load the same `.env` automatically. During development, `uv run --env-file .env ...` remains available as an explicit override.
 
 ### Choosing an Embedding Model
 
@@ -71,27 +86,22 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 
 ## Claude Code Integration
 
-MAPCE now keeps its LanceDB connection and embedding model in one local background service. One service is allowed per `MAPCE_DATA_DIR`; the stdio process started by Claude Code is a lightweight proxy that starts or reuses that service. Existing MCP configuration remains valid.
+MAPCE keeps its LanceDB connection and embedding model in one local background service. One service is allowed per `MAPCE_DATA_DIR`; the stdio process started by Claude Code is a lightweight proxy that starts or reuses that service. Existing `uv run` MCP configurations remain compatible, while global installations can use the shorter command below.
 
-Create `.mcp.json` in the project root:
+After global installation, create `.mcp.json` in the project root. Replace `/path/to/mapce-mcp` with the output of `command -v mapce-mcp`:
 
 ```json
 {
   "mcpServers": {
     "mapce": {
-      "command": "/opt/homebrew/bin/uv",
-      "args": [
-        "run",
-        "--directory", "/path/to/mapce",
-        "--env-file", "/path/to/mapce/.env",
-        "python", "-m", "mapce.mcp.server"
-      ]
+      "command": "/path/to/mapce-mcp",
+      "args": []
     }
   }
 }
 ```
 
-Replace `/path/to/mapce` with the actual path. Restart Claude Code, approve the MAPCE server, and interact in natural language:
+Restart Claude Code, approve the MAPCE server, and interact in natural language:
 
 > Search for papers on diffusion policy for robot control
 >
@@ -102,11 +112,11 @@ Replace `/path/to/mapce` with the actual path. Restart Claude Code, approve the 
 ### Background Service Management
 
 ```bash
-uv run --env-file .env mapce serve
-uv run --env-file .env mapce serve-status
-uv run --env-file .env mapce serve-logs
-uv run --env-file .env mapce serve-kill
-uv run --env-file .env mapce serve-restart
+mapce serve
+mapce serve-status
+mapce serve-logs
+mapce serve-kill
+mapce serve-restart
 ```
 
 Closing an MCP client leaves the background service running. `serve-kill` requests a graceful shutdown; `serve-kill --force` only targets the exact process whose identity passed the service health check.
@@ -116,7 +126,7 @@ Closing an MCP client leaves the background service running. `serve-kill` reques
 Run `mapce` without a subcommand to open the Textual TUI. It accesses the database only through the same local service, so the UI process does not load LanceDB or the embedding model.
 
 ```bash
-uv run --env-file .env mapce
+mapce
 ```
 
 The five tabs cover dashboard, paper inventory, indexing, jobs, and system diagnostics. The paper inventory uses one numbered scrollable table without pagination and can sort by publication year, indexing time, title, Paper ID, chunk count, or code status. You can resolve a paper by internal ID or arXiv ID, inspect paper/code state, submit indexing and deletion jobs, review repository candidates, and inspect logs. Pressing `q` closes only the UI client and leaves the service running.

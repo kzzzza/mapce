@@ -7,7 +7,7 @@ MAPCE provides a TUI database manager, a scriptable CLI, MCP tools for Agents, a
 ## TUI Database Manager
 
 ```bash
-uv run --env-file .env mapce
+mapce
 ```
 
 The TUI is a database-management and status-visualization interface. Paper understanding and note writing remain the responsibility of an Agent calling MAPCE over MCP.
@@ -24,20 +24,28 @@ The interface requires a terminal of at least 76×22. Pressing `q` closes only t
 
 ## CLI Management Commands
 
+After the first global installation, save the default environment file so commands work from any directory:
+
 ```bash
-uv run mapce papers list
-uv run mapce papers find 2412.04368 --json
-uv run mapce papers show 2412.04368
-uv run mapce search paper "diffusion policy" --top-k 10
-uv run mapce search content 2412.04368 "training objective"
-uv run mapce index paper 2501.00001 --type arxiv
-uv run mapce index code https://github.com/owner/repo --paper 2501.00001
-uv run mapce jobs list
-uv run mapce stats
-uv run mapce doctor
+uv tool install /path/to/mapce
+mapce config set-env /path/to/mapce/.env
+mapce config show
 ```
 
-Indexing and deletion run through the serialized background queue. Commands with `--json` are suitable for scripts; run `uv run mapce <command> --help` for complete options.
+```bash
+mapce papers list
+mapce papers find 2412.04368 --json
+mapce papers show 2412.04368
+mapce search paper "diffusion policy" --top-k 10
+mapce search content 2412.04368 "training objective"
+mapce index paper 2501.00001 --type arxiv
+mapce index code https://github.com/owner/repo --paper 2501.00001
+mapce jobs list
+mapce stats
+mapce doctor
+```
+
+Indexing and deletion run through the serialized background queue. Commands with `--json` are suitable for scripts; run `mapce <command> --help` for complete options.
 
 ## Python SDK
 
@@ -217,33 +225,28 @@ MAPCE returns content with source locations; the calling Agent remains responsib
 
 ## MCP Server (Claude Code Integration)
 
-Create `.mcp.json` in the project root:
+The global installation also provides the lightweight `mapce-mcp` stdio command. Create `.mcp.json` in the project root and replace the command path with the output of `command -v mapce-mcp`:
 
 ```json
 {
   "mcpServers": {
     "mapce": {
-      "command": "/opt/homebrew/bin/uv",
-      "args": [
-        "run",
-        "--directory", "/path/to/mapce",
-        "--env-file", "/path/to/mapce/.env",
-        "python", "-m", "mapce.mcp.server"
-      ]
+      "command": "/path/to/mapce-mcp",
+      "args": []
     }
   }
 }
 ```
 
-Replace `/path/to/mapce` with the actual path. Restart Claude Code, approve the server, and all tools above become available. The stdio entry point only forwards requests and does not load LanceDB or the embedding model; clients using the same `MAPCE_DATA_DIR` reuse one service.
+Restart Claude Code, approve the server, and all tools above become available. The stdio entry point only forwards requests and does not load LanceDB or the embedding model; clients using the same `MAPCE_DATA_DIR` reuse one service.
 
 ```bash
 # Service management
-uv run mapce serve
-uv run mapce serve-status
-uv run mapce serve-logs
-uv run mapce serve-kill
+mapce serve
+mapce serve-status
+mapce serve-logs
+mapce serve-kill
 
 # Debug the stdio proxy
-uv run python -m mapce.mcp.server
+mapce-mcp
 ```

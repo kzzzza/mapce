@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from typer.testing import CliRunner
 
 from mapce import cli
@@ -63,3 +65,21 @@ def test_index_command_submits_background_job(monkeypatch):
     assert result.exit_code == 0
     assert '"tool": "index_paper"' in result.stdout
     assert '"source_type": "arxiv"' in result.stdout
+
+
+def test_config_set_env_then_regular_command_loads_it(monkeypatch, tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text("MAPCE_CLI_CONFIG_TEST=loaded\n", encoding="utf-8")
+    monkeypatch.delenv("MAPCE_CLI_CONFIG_TEST", raising=False)
+    monkeypatch.setattr(cli, "MapceClient", FakeClient)
+
+    saved = runner.invoke(cli.app, ["config", "set-env", str(env_file)])
+    shown = runner.invoke(cli.app, ["config", "show"])
+    stats = runner.invoke(cli.app, ["stats", "--json"])
+
+    assert saved.exit_code == 0
+    assert str(env_file) in saved.stdout
+    assert shown.exit_code == 0
+    assert '"source": "config"' in shown.stdout
+    assert stats.exit_code == 0
+    assert os.environ["MAPCE_CLI_CONFIG_TEST"] == "loaded"

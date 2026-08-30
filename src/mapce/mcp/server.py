@@ -56,6 +56,13 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
+    from mapce.configuration import ConfigurationError, load_configured_env
+
+    try:
+        load_configured_env(strict=True)
+    except ConfigurationError as exc:
+        logger.error("%s: %s", exc.error_code, exc)
+        raise SystemExit(78) from exc
     server = create_server()
 
     async def run() -> None:

@@ -4,11 +4,19 @@
 
 ## `MINERU_API_TOKEN is not set`
 
-在 `.env` 中设置密钥，确保 MCP Server 启动命令包含 `--env-file` 参数。
+在 `.env` 中设置密钥，然后运行 `mapce config set-env /path/to/mapce/.env`。用 `mapce config show` 检查路径是否存在；输出不会显示密钥。
+
+## `mapce: command not found`
+
+先运行 `uv tool install /path/to/mapce`。如果已经安装但 shell 找不到命令，运行 `uv tool update-shell`，再重新打开终端。
+
+## `env_file_not_found`
+
+保存的 `.env` 被移动或删除。使用 `mapce config show` 查看旧路径，再执行 `mapce config set-env /new/path/.env`；暂时不需要环境文件时可执行 `mapce config unset-env`。
 
 ## `ModuleNotFoundError: No module named 'mapce'`
 
-在 `mapce/` 目录下用 `uv run` 执行，或使用 `--directory` 参数指定项目路径。
+开发模式下在 `mapce/` 目录执行 `uv run mapce`；日常使用建议执行 `uv tool install /path/to/mapce` 后直接运行 `mapce`。
 
 ## `ImportError: Using SOCKS proxy, but 'socksio' package is not installed`
 
@@ -51,7 +59,7 @@ instead of CLS embedding.
 
 ## `service_port_in_use`
 
-默认端口 `127.0.0.1:8765` 被其他进程占用。先运行 `uv run mapce serve-status`；如果没有可验证的 MAPCE 服务，检查占用端口的进程，或通过 `MAPCE_SERVICE_PORT` 选择其他端口。MAPCE 不会终止无法验证身份的进程。
+默认端口 `127.0.0.1:8765` 被其他进程占用。先运行 `mapce serve-status`；如果没有可验证的 MAPCE 服务，检查占用端口的进程，或通过 `MAPCE_SERVICE_PORT` 选择其他端口。MAPCE 不会终止无法验证身份的进程。
 
 ## 服务元数据残留
 
@@ -63,4 +71,4 @@ TUI 需要至少 76 列、22 行。放大终端窗口后界面会自动恢复，
 
 ## TUI 无法连接或后台刚被重启
 
-进入“系统”页选择“重新连接”，或退出后重新运行 `uv run mapce`。重启后台会使已有 HTTP/MCP 连接失效；新连接会自动读取新的服务地址和本地令牌。退出 TUI 本身不会停止后台。
+进入“系统”页选择“重新连接”，或退出后重新运行 `mapce`。重启后台会使已有 HTTP/MCP 连接失效；新连接会自动读取新的服务地址和本地令牌。退出 TUI 本身不会停止后台。

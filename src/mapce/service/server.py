@@ -87,6 +87,13 @@ async def serve(data_dir: str | Path | None, host: str, port: int) -> int:
 
 
 def main() -> None:
+    from mapce.configuration import ConfigurationError, load_configured_env
+
+    try:
+        load_configured_env(strict=True)
+    except ConfigurationError as exc:
+        logging.error("%s: %s", exc.error_code, exc)
+        raise SystemExit(78) from exc
     args = _parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     raise SystemExit(asyncio.run(serve(args.data_dir, args.host, args.port)))

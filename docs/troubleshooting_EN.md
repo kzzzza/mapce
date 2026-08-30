@@ -4,11 +4,19 @@
 
 ## `MINERU_API_TOKEN is not set`
 
-Set the token in `.env` and ensure the MCP Server launch command includes `--env-file`.
+Set the token in `.env`, then run `mapce config set-env /path/to/mapce/.env`. Use `mapce config show` to verify that the path exists; secret values are never displayed.
+
+## `mapce: command not found`
+
+Run `uv tool install /path/to/mapce`. If the tool is installed but the shell cannot find it, run `uv tool update-shell` and open a new shell.
+
+## `env_file_not_found`
+
+The saved `.env` was moved or deleted. Use `mapce config show` to inspect the old path, then run `mapce config set-env /new/path/.env`; use `mapce config unset-env` if no dotenv file is currently needed.
 
 ## `ModuleNotFoundError: No module named 'mapce'`
 
-Run with `uv run` from the `mapce/` directory, or use `--directory` to point to the project path.
+For development, run `uv run mapce` from the `mapce/` directory. For daily use, run `uv tool install /path/to/mapce` and invoke `mapce` directly.
 
 ## `ImportError: Using SOCKS proxy, but 'socksio' package is not installed`
 
@@ -51,7 +59,7 @@ This is a normal model version change notice. Current functionality is unaffecte
 
 ## `service_port_in_use`
 
-Another process is using the default `127.0.0.1:8765` endpoint. Run `uv run mapce serve-status` first. If no verified MAPCE service is present, inspect the process using the port or choose another port with `MAPCE_SERVICE_PORT`. MAPCE does not terminate processes whose identity it cannot verify.
+Another process is using the default `127.0.0.1:8765` endpoint. Run `mapce serve-status` first. If no verified MAPCE service is present, inspect the process using the port or choose another port with `MAPCE_SERVICE_PORT`. MAPCE does not terminate processes whose identity it cannot verify.
 
 ## Stale Service Metadata
 
@@ -63,4 +71,4 @@ The TUI requires at least 76 columns and 22 rows. Enlarge the terminal and the i
 
 ## TUI Cannot Connect After a Service Restart
 
-Use **Reconnect** on the System tab, or close and rerun `uv run mapce`. Restarting the service invalidates existing HTTP/MCP connections; a new connection reads the current endpoint and local token. Closing the TUI itself does not stop the service.
+Use **Reconnect** on the System tab, or close and rerun `mapce`. Restarting the service invalidates existing HTTP/MCP connections; a new connection reads the current endpoint and local token. Closing the TUI itself does not stop the service.

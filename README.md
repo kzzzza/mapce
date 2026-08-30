@@ -36,6 +36,19 @@ cp .env.example .env
 
 # 4. 初始化数据库并下载嵌入模型（仅首次，约 2.1 GB）
 uv run --env-file .env python scripts/init_db.py
+
+# 5. 安装为全局工具，并保存默认 .env 路径
+uv tool install .
+uv tool update-shell  # 仅在 mapce 尚未加入 PATH 时需要
+mapce config set-env "$(pwd)/.env"
+```
+
+重新打开终端后，可以在任意目录直接运行 `mapce`。`uv tool install` 使用独立的工具环境，因此不会自动读取项目根目录的 `.env`；`config set-env` 只把该文件的绝对路径写入 `~/.mapce/config.json`，不会复制或显示其中的密钥。
+
+```bash
+mapce config show       # 查看当前生效的路径，不显示环境变量内容
+mapce config unset-env  # 删除保存的路径
+uv tool install --reinstall .  # 从项目目录更新全局安装
 ```
 
 ### .env 环境变量
@@ -51,6 +64,8 @@ uv run --env-file .env python scripts/init_db.py
 | `MAPCE_LOG_LEVEL` | `INFO` | 日志级别 |
 | `http_proxy` / `https_proxy` | — | HTTP 代理（国内必填） |
 
+进程中已经设置的环境变量优先级高于 `.env`。高级用法可用 `MAPCE_ENV_FILE` 临时覆盖已保存的 `.env` 路径，或用 `MAPCE_CONFIG_FILE` 覆盖配置文件位置（默认为 `~/.mapce/config.json`）。
+
 ### 代理配置（中国大陆用户）
 
 编辑 `.env`，取消注释：
@@ -60,7 +75,7 @@ http_proxy=http://127.0.0.1:9674
 https_proxy=http://127.0.0.1:9674
 ```
 
-`uv run --env-file .env` 和 MCP Server 的 `--env-file` 参数自动加载，无需手动 export。
+保存默认路径后，`mapce`、`mapce-mcp` 和后台服务都会自动加载同一个 `.env`，无需手动 export。开发时仍可使用 `uv run --env-file .env ...` 临时指定环境文件。
 
 ### 选择嵌入模型
 
@@ -71,21 +86,16 @@ uv run python -c "from fastembed import TextEmbedding; print([m['model'] for m i
 
 ## 接入 Claude Code
 
-MAPCE 通过一个本地后台服务集中持有 LanceDB 连接和嵌入模型。同一个 `MAPCE_DATA_DIR` 只运行一个服务；Claude Code 启动的 stdio 进程是轻量代理，会自动启动或复用后台服务。原有 MCP 配置不需要改变。
+MAPCE 通过一个本地后台服务集中持有 LanceDB 连接和嵌入模型。同一个 `MAPCE_DATA_DIR` 只运行一个服务；Claude Code 启动的 stdio 进程是轻量代理，会自动启动或复用后台服务。原有基于 `uv run` 的 MCP 配置仍然兼容，全局安装后可改用更短的命令。
 
-在项目根目录创建 `.mcp.json`：
+全局安装后，在项目根目录创建 `.mcp.json`。将 `/path/to/mapce-mcp` 替换为 `command -v mapce-mcp` 的输出：
 
 ```json
 {
   "mcpServers": {
     "mapce": {
-      "command": "/opt/homebrew/bin/uv",
-      "args": [
-        "run",
-        "--directory", "/path/to/mapce",
-        "--env-file", "/path/to/mapce/.env",
-        "python", "-m", "mapce.mcp.server"
-      ]
+      "command": "/path/to/mapce-mcp",
+      "args": []
     }
   }
 }
@@ -102,11 +112,11 @@ MAPCE 通过一个本地后台服务集中持有 LanceDB 连接和嵌入模型�
 ### 后台服务管理
 
 ```bash
-uv run --env-file .env mapce serve          # 启动或复用后台服务
-uv run --env-file .env mapce serve-status   # 查看 PID、端口和模型加载状态
-uv run --env-file .env mapce serve-logs     # 查看日志路径
-uv run --env-file .env mapce serve-kill     # 在安全点正常停止
-uv run --env-file .env mapce serve-restart  # 重启服务
+mapce serve          # 启动或复用后台服务
+mapce serve-status   # 查看 PID、端口和模型加载状态
+mapce serve-logs     # 查看日志路径
+mapce serve-kill     # 在安全点正常停止
+mapce serve-restart  # 重启服务
 ```
 
 退出 MCP 客户端不会停止后台服务。只有 `serve-kill` 会请求停止；`serve-kill --force` 只用于已经通过健康检查验证身份的准确进程。
@@ -116,7 +126,7 @@ uv run --env-file .env mapce serve-restart  # 重启服务
 不带子命令运行 `mapce` 会打开 Textual TUI。它只通过同一个本地后台服务访问数据库，不会在界面进程中加载 LanceDB 或嵌入模型。
 
 ```bash
-uv run --env-file .env mapce
+mapce
 ```
 
 界面包含总览、论文库、索引、任务和系统五个页签。论文库使用带序号的单页滚动表格，可按发表年份、入库时间、标题、Paper ID、Chunk 数量或代码状态排序，并支持内部 ID/arXiv 编号精确查找。界面还可查看论文与代码状态、提交索引/删除任务、审核候选仓库、查看日志和诊断后台。按 `q` 退出界面不会停止后台服务。

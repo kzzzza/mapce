@@ -7,7 +7,7 @@ MAPCE 提供 TUI 数据库管理界面、可脚本化 CLI、Agent 使用的 MCP 
 ## TUI 数据库管理
 
 ```bash
-uv run --env-file .env mapce
+mapce
 ```
 
 TUI 定位为数据库管理与状态可视化界面，论文理解和笔记撰写仍由通过 MCP 调用 MAPCE 的 Agent 完成。
@@ -24,20 +24,28 @@ TUI 定位为数据库管理与状态可视化界面，论文理解和笔记撰�
 
 ## CLI 管理命令
 
+首次全局安装后保存默认环境文件，之后命令可以在任意目录运行：
+
 ```bash
-uv run mapce papers list
-uv run mapce papers find 2412.04368 --json
-uv run mapce papers show 2412.04368
-uv run mapce search paper "diffusion policy" --top-k 10
-uv run mapce search content 2412.04368 "training objective"
-uv run mapce index paper 2501.00001 --type arxiv
-uv run mapce index code https://github.com/owner/repo --paper 2501.00001
-uv run mapce jobs list
-uv run mapce stats
-uv run mapce doctor
+uv tool install /path/to/mapce
+mapce config set-env /path/to/mapce/.env
+mapce config show
 ```
 
-索引和删除通过后台任务队列串行执行。带 `--json` 的命令适合脚本读取；完整参数使用 `uv run mapce <命令> --help` 查看。
+```bash
+mapce papers list
+mapce papers find 2412.04368 --json
+mapce papers show 2412.04368
+mapce search paper "diffusion policy" --top-k 10
+mapce search content 2412.04368 "training objective"
+mapce index paper 2501.00001 --type arxiv
+mapce index code https://github.com/owner/repo --paper 2501.00001
+mapce jobs list
+mapce stats
+mapce doctor
+```
+
+索引和删除通过后台任务队列串行执行。带 `--json` 的命令适合脚本读取；完整参数使用 `mapce <命令> --help` 查看。
 
 ## Python SDK
 
@@ -217,33 +225,28 @@ MAPCE 返回正文和来源定位，笔记撰写仍由调用它的 Agent 完成�
 
 ## MCP Server（Claude Code 集成）
 
-在项目根目录创建 `.mcp.json`：
+全局安装会同时提供轻量 stdio 命令 `mapce-mcp`。在项目根目录创建 `.mcp.json`，并把命令路径替换为 `command -v mapce-mcp` 的输出：
 
 ```json
 {
   "mcpServers": {
     "mapce": {
-      "command": "/opt/homebrew/bin/uv",
-      "args": [
-        "run",
-        "--directory", "/path/to/mapce",
-        "--env-file", "/path/to/mapce/.env",
-        "python", "-m", "mapce.mcp.server"
-      ]
+      "command": "/path/to/mapce-mcp",
+      "args": []
     }
   }
 }
 ```
 
-`/path/to/mapce` 替换为实际路径。重启 Claude Code、批准服务器后即可直接用自然语言调用上述所有工具。stdio 入口只转发请求，不加载 LanceDB 和嵌入模型；同一个 `MAPCE_DATA_DIR` 的客户端会复用唯一后台服务。
+重启 Claude Code、批准服务器后即可直接用自然语言调用上述所有工具。stdio 入口只转发请求，不加载 LanceDB 和嵌入模型；同一个 `MAPCE_DATA_DIR` 的客户端会复用唯一后台服务。
 
 ```bash
 # 服务管理
-uv run mapce serve
-uv run mapce serve-status
-uv run mapce serve-logs
-uv run mapce serve-kill
+mapce serve
+mapce serve-status
+mapce serve-logs
+mapce serve-kill
 
 # 调试 stdio 代理
-uv run python -m mapce.mcp.server
+mapce-mcp
 ```

@@ -41,6 +41,9 @@ def _health(info: ServiceInfo, timeout: float = 1.0) -> dict[str, Any] | None:
 
 
 def get_service_status(data_dir: str | Path | None = None) -> dict[str, Any]:
+    from mapce.configuration import load_configured_env
+
+    load_configured_env(strict=True)
     info = read_service_info(data_dir)
     if info is None:
         return {"running": False, "status": "stopped", "info": None}
@@ -78,6 +81,9 @@ def ensure_service(
     port: int | None = None,
     timeout: float = 15.0,
 ) -> ServiceInfo:
+    from mapce.configuration import load_configured_env
+
+    load_configured_env(strict=True)
     normalized = normalize_data_dir(data_dir)
     configured_port = port or int(os.environ.get("MAPCE_SERVICE_PORT", "8765"))
     existing = read_service_info(normalized)

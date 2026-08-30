@@ -31,6 +31,7 @@ dependencies = [
 
 [project.scripts]
 mapce = "mapce.cli:main"
+mapce-mcp = "mapce.mcp.server:main"
 
 [project.optional-dependencies]
 dev = [
