@@ -8,7 +8,13 @@ import logging
 from typing import Any
 
 
-WRITE_TOOLS = frozenset({"index_paper", "index_code", "delete_paper"})
+WRITE_TOOLS = frozenset({
+    "index_paper",
+    "index_code",
+    "delete_paper",
+    "review_code_repository",
+    "delete_code_repository",
+})
 SEMANTIC_TOOLS = frozenset({"search_papers", "search_code"})
 logger = logging.getLogger("mapce.application.dispatcher")
 

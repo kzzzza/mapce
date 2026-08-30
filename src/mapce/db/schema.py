@@ -97,7 +97,7 @@ CODE_REPOS_SCHEMA = pa.schema([
     pa.field("evidence", pa.string(), nullable=True),
     pa.field("is_primary", pa.bool_(), nullable=False),
     pa.field("status", pa.string(), nullable=False),
-    # candidate | pending | indexing | indexed | failed
+    # candidate | pending | indexing | indexed | failed | ignored
     pa.field("discovered_at", pa.string(), nullable=False),
     pa.field("indexed_at", pa.string(), nullable=True),
     pa.field("updated_at", pa.string(), nullable=False),

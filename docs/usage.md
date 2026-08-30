@@ -2,7 +2,42 @@
 
 # 使用方法
 
-可以通过 Python SDK 直接调用，或通过 Claude Code 自然语言交互。MCP、命令行和后续 TUI 共用一个本地后台服务；Python SDK 仍可用于开发与维护脚本。
+MAPCE 提供 TUI 数据库管理界面、可脚本化 CLI、Agent 使用的 MCP 工具和 Python SDK。TUI、CLI 与 MCP 共用一个本地后台服务；Python SDK 仍可用于开发与维护脚本。
+
+## TUI 数据库管理
+
+```bash
+uv run --env-file .env mapce
+```
+
+TUI 定位为数据库管理与状态可视化界面，论文理解和笔记撰写仍由通过 MCP 调用 MAPCE 的 Agent 完成。
+
+| 页签 | 功能 |
+|------|------|
+| 总览 | 服务内存、论文/chunk 数量、数据库大小、代码状态和辅助索引状态 |
+| 论文库 | 列表与筛选、内部 ID/arXiv ID 精确查找、语义检索、摘要/目录/仓库查看、删除确认 |
+| 索引 | 提交论文与代码索引任务，审核、忽略或指定候选仓库，删除某个仓库的代码索引 |
+| 任务 | 查看串行写任务，取消排队任务，重试失败任务 |
+| 系统 | 服务路径、内存、索引诊断、最近日志、重新连接和确认后重启 |
+
+界面要求至少 76×22 的终端尺寸。按 `q` 只退出 TUI，不会停止后台服务；需要停止服务时使用 `mapce serve-kill`。
+
+## CLI 管理命令
+
+```bash
+uv run mapce papers list
+uv run mapce papers find 2412.04368 --json
+uv run mapce papers show 2412.04368
+uv run mapce search paper "diffusion policy" --top-k 10
+uv run mapce search content 2412.04368 "training objective"
+uv run mapce index paper 2501.00001 --type arxiv
+uv run mapce index code https://github.com/owner/repo --paper 2501.00001
+uv run mapce jobs list
+uv run mapce stats
+uv run mapce doctor
+```
+
+索引和删除通过后台任务队列串行执行。带 `--json` 的命令适合脚本读取；完整参数使用 `uv run mapce <命令> --help` 查看。
 
 ## Python SDK
 

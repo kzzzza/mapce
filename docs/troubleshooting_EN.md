@@ -56,3 +56,11 @@ Another process is using the default `127.0.0.1:8765` endpoint. Run `uv run mapc
 ## Stale Service Metadata
 
 A forced termination can briefly leave `service.json` behind, while the operating system still releases the `flock` when the process exits. The next `mapce serve` rewrites runtime metadata after acquiring the lock. Do not terminate an unrelated process based only on a stale PID.
+
+## TUI Reports That the Terminal Is Too Small
+
+The TUI requires at least 76 columns and 22 rows. Enlarge the terminal and the interface will recover automatically. This guard prevents data tables and confirmation dialogs from becoming misaligned.
+
+## TUI Cannot Connect After a Service Restart
+
+Use **Reconnect** on the System tab, or close and rerun `uv run mapce`. Restarting the service invalidates existing HTTP/MCP connections; a new connection reads the current endpoint and local token. Closing the TUI itself does not stop the service.

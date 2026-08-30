@@ -8,6 +8,7 @@ import os
 import sys
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -127,6 +128,7 @@ def create_app(
                 "pid": os.getpid(),
                 "host": info.host,
                 "port": info.port,
+                "base_url": info.base_url,
                 "data_dir_hash": info.data_dir_hash,
                 "version": __version__,
                 "embedding_loaded": _embedding_loaded(),
@@ -142,6 +144,63 @@ def create_app(
                 "status": "ok",
                 "tools": [tool.model_dump(mode="json", by_alias=True) for tool in TOOL_DEFINITIONS],
             }
+        )
+
+    async def doctor(_: Request) -> JSONResponse:
+        def inspect_paths() -> dict[str, Any]:
+            data_path = Path(info.data_dir)
+            size = 0
+            file_count = 0
+            if data_path.exists():
+                for root, _, files in os.walk(data_path):
+                    for filename in files:
+                        try:
+                            size += (Path(root) / filename).stat().st_size
+                            file_count += 1
+                        except OSError:
+                            continue
+            return {
+                "data_dir": str(data_path),
+                "data_dir_exists": data_path.exists(),
+                "database_size_bytes": size,
+                "database_file_count": file_count,
+                "runtime_dir": str(Path(info.token_file).parent),
+                "log_path": str(Path(info.token_file).with_name("service.log")),
+            }
+
+        paths = await asyncio.to_thread(inspect_paths)
+        return JSONResponse(
+            {
+                "status": "ok",
+                "service_id": info.service_id,
+                "version": __version__,
+                "host": info.host,
+                "port": info.port,
+                "embedding_loaded": _embedding_loaded(),
+                "warmup_enabled": os.environ.get("MAPCE_WARMUP_EMBEDDING", "0").lower()
+                in {"1", "true", "yes", "on"},
+                **paths,
+            }
+        )
+
+    async def service_logs(request: Request) -> JSONResponse:
+        try:
+            tail = min(max(int(request.query_params.get("tail", "200")), 1), 500)
+        except ValueError:
+            return JSONResponse(
+                {"status": "error", "error_code": "invalid_tail", "message": "tail must be an integer."},
+                status_code=400,
+            )
+        path = Path(info.token_file).with_name("service.log")
+
+        def read_lines() -> list[str]:
+            try:
+                return path.read_text(encoding="utf-8", errors="replace").splitlines()[-tail:]
+            except FileNotFoundError:
+                return []
+
+        return JSONResponse(
+            {"status": "ok", "path": str(path), "lines": await asyncio.to_thread(read_lines)}
         )
 
     async def call_tool(request: Request) -> JSONResponse:
@@ -228,6 +287,8 @@ def create_app(
         Route("/health", health, methods=["GET"]),
         Route("/api/service", service_status, methods=["GET"]),
         Route("/api/tools", list_tools, methods=["GET"]),
+        Route("/api/doctor", doctor, methods=["GET"]),
+        Route("/api/logs", service_logs, methods=["GET"]),
         Route("/api/tools/{name:str}", call_tool, methods=["POST"]),
         Route("/api/jobs", submit_job, methods=["POST"]),
         Route("/api/jobs", list_jobs, methods=["GET"]),

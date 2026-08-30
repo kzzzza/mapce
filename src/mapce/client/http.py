@@ -50,7 +50,14 @@ class MapceClient:
         token = read_token(Path(info.token_file))
         return {"Authorization": f"Bearer {token}"}
 
-    def request(self, method: str, path: str, *, json: dict[str, Any] | None = None) -> dict[str, Any]:
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         info = self.connect()
         try:
             response = self._http.request(
@@ -58,6 +65,7 @@ class MapceClient:
                 f"{info.base_url}{path}",
                 headers=self._headers(),
                 json=json,
+                params=params,
             )
         except (OSError, httpx.HTTPError) as exc:
             raise ServiceClientError("service_unavailable", str(exc)) from exc
@@ -83,6 +91,42 @@ class MapceClient:
 
     def submit_job(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return self.request("POST", "/api/jobs", json={"tool": tool, "arguments": arguments})
+
+    def list_jobs(self) -> dict[str, Any]:
+        return self.request("GET", "/api/jobs")
+
+    def get_job(self, job_id: str) -> dict[str, Any]:
+        return self.request("GET", f"/api/jobs/{job_id}")
+
+    def cancel_job(self, job_id: str) -> dict[str, Any]:
+        return self.request("POST", f"/api/jobs/{job_id}/cancel")
+
+    def doctor(self) -> dict[str, Any]:
+        return self.request("GET", "/api/doctor")
+
+    def logs(self, tail: int = 200) -> dict[str, Any]:
+        return self.request("GET", "/api/logs", params={"tail": tail})
+
+    def reset_connection(self) -> None:
+        self._http.close()
+        self._http = httpx.Client(timeout=self.timeout)
+        self._info = None
+
+    def restart_service(self) -> ServiceInfo:
+        from mapce.service.process import ServiceProcessError, ensure_service, stop_service
+
+        result = stop_service(self.data_dir)
+        if result.get("status") == "error":
+            raise ServiceClientError(
+                result.get("error_code", "restart_failed"),
+                result.get("message", "MAPCE service restart failed."),
+            )
+        self.reset_connection()
+        try:
+            self._info = ensure_service(self.data_dir)
+        except ServiceProcessError as exc:
+            raise ServiceClientError(exc.error_code, str(exc)) from exc
+        return self._info
 
     def close(self) -> None:
         self._http.close()

@@ -105,3 +105,30 @@ async def test_write_job_api_returns_trackable_job(tmp_path):
 
     assert submitted.status_code == 202
     assert current.json()["job"]["result"]["name"] == "index_paper"
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_and_bounded_logs_use_authenticated_api(tmp_path):
+    info = _info(tmp_path)
+    log_path = tmp_path / "service.log"
+    log_path.write_text("one\ntwo\nthree\n", encoding="utf-8")
+    app = create_app(info, "secret", dispatcher=FakeDispatcher())
+    transport = httpx.ASGITransport(app=app)
+    headers = {"Authorization": "Bearer secret"}
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://127.0.0.1:8765",
+            headers=headers,
+        ) as client:
+            service = await client.get("/api/service")
+            doctor = await client.get("/api/doctor")
+            logs = await client.get("/api/logs", params={"tail": 2})
+            invalid = await client.get("/api/logs", params={"tail": "many"})
+
+    assert service.json()["base_url"] == "http://127.0.0.1:8765"
+    assert doctor.json()["data_dir"] == str(tmp_path)
+    assert doctor.json()["database_file_count"] >= 1
+    assert logs.json()["lines"] == ["two", "three"]
+    assert invalid.status_code == 400
+    assert invalid.json()["error_code"] == "invalid_tail"

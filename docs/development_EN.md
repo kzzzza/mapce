@@ -49,7 +49,8 @@ mapce/
 │   ├── application/             # Tool dispatch and serialized write jobs
 │   ├── service/                 # Singleton lock, HTTP service, process lifecycle
 │   ├── client/                  # Shared HTTP client for CLI, TUI, and stdio proxy
-│   ├── cli.py                   # Service management entry point
+│   ├── cli.py                   # Typer CLI and TUI launch entry point
+│   ├── tui/                     # Textual database manager and five tabs
 │   │
 │   ├── mineru/                  # MinerU API wrapper
 │   │   ├── api.py               # httpx implementation
@@ -70,7 +71,7 @@ mapce/
 └── tests/
 ```
 
-In production, one background service owns each normalized `MAPCE_DATA_DIR`. A lifetime `flock` prevents duplicate instances, while the service centralizes LanceDB, the lazily loaded embedding model, and serialized write jobs. The CLI and stdio MCP proxy use the local HTTP client and do not load the database or model when imported.
+In production, one background service owns each normalized `MAPCE_DATA_DIR`. A lifetime `flock` prevents duplicate instances, while the service centralizes LanceDB, the lazily loaded embedding model, and serialized write jobs. TUI, CLI, and the stdio MCP proxy use the local HTTP client and do not load the database or model when imported. The TUI focuses on database management, while Agents read paper content through structured MCP tools.
 
 ### Indexing Pipeline
 

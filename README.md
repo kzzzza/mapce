@@ -111,11 +111,23 @@ uv run --env-file .env mapce serve-restart  # 重启服务
 
 退出 MCP 客户端不会停止后台服务。只有 `serve-kill` 会请求停止；`serve-kill --force` 只用于已经通过健康检查验证身份的准确进程。
 
+## 终端数据库管理界面
+
+不带子命令运行 `mapce` 会打开 Textual TUI。它只通过同一个本地后台服务访问数据库，不会在界面进程中加载 LanceDB 或嵌入模型。
+
+```bash
+uv run --env-file .env mapce
+```
+
+界面包含总览、论文库、索引、任务和系统五个页签，可按内部 ID 或 arXiv 编号精确查找论文、查看论文与代码状态、提交索引/删除任务、审核候选仓库、查看日志和诊断后台。按 `q` 退出界面不会停止后台服务。
+
+需要脚本化管理时，可使用 `mapce papers`、`mapce search`、`mapce index`、`mapce jobs`、`mapce stats` 和 `mapce doctor`；各子命令可通过 `--help` 查看参数。
+
 ## 文档索引
 
 | 文档 | 内容 |
 |------|------|
-| [docs/usage.md](docs/usage.md) | Python SDK 用法、MCP 工具参考（11 个）、论文深度读取、Claude Code 集成 |
+| [docs/usage.md](docs/usage.md) | TUI/CLI、Python SDK、MCP 工具参考（11 个）、论文深度读取与 Agent 集成 |
 | [docs/data-sources.md](docs/data-sources.md) | 数据源适配器（arXiv、Zotero、本地 PDF、目录批量） |
 | [docs/storage.md](docs/storage.md) | 存储形式：LanceDB、模型缓存、临时文件、清理 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题与解决方案 |
@@ -128,7 +140,7 @@ uv run --env-file .env mapce serve-restart  # 重启服务
 - [ ] **代码检索排序**：当前代码文件 `Recall@5` 基线约为 0.65。后续需要融合仓库、文件路径、代码符号和调用关系等信号，并为不同编程语言建立更细的评测集
 - [ ] **代码分析增强**：Python 使用 AST 解析，C++/CUDA 仍依赖正则，暂不能可靠处理模板元编程和复杂宏展开。后续考虑接入 Tree-sitter 或语言服务器，并支持 Makefile、Dockerfile、Shell 等文件
 - [ ] **自动更新机制**：检测 arXiv 新版本和代码仓库新 commit，先展示变化，再由用户确认是否增量同步；同时加入辅助索引刷新和失败任务重试
-- [ ] **前端界面**：目前以 MCP 和命令行为主，后续提供论文、章节、图表、仓库关联和索引状态的浏览界面
+- [x] **终端管理界面**：提供轻量 Textual TUI，用于论文状态浏览、arXiv 精确查找、索引任务、候选仓库审核、删除确认、后台日志和系统诊断；TUI、CLI 与 MCP 共用单一后台服务
 - [ ] **Zotero 深度集成**：在 PDF 导入之外，同步 Zotero 笔记、标签和集合，或提供 Zotero Agent 插件
 
 ## 许可

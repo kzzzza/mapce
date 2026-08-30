@@ -26,7 +26,7 @@ CODE_STATUSES = {
     "not_checked", "no_code", "needs_review", "pending",
     "indexing", "indexed", "failed",
 }
-REPO_STATUSES = {"candidate", "pending", "indexing", "indexed", "failed"}
+REPO_STATUSES = {"candidate", "pending", "indexing", "indexed", "failed", "ignored"}
 
 _GITHUB_URL_RE = re.compile(
     r"(?<![A-Za-z0-9_.-])(?:https?://)?(?:www\.)?github\.com/"
@@ -258,7 +258,7 @@ def save_discovered_repositories(
     for candidate in candidates:
         existing = existing_rows.get(candidate["repo_url"])
         status = candidate["status"]
-        if existing and existing.get("status") in {"indexing", "indexed", "failed"}:
+        if existing and existing.get("status") in {"indexing", "indexed", "failed", "ignored"}:
             status = existing["status"]
         preserve_user = existing is not None and existing.get("source") == "user"
         stored_score = (
@@ -319,13 +319,17 @@ def sync_paper_code_state(
         return None
     repo_table = init_code_repos(db)
     rows = list_code_repos(repo_table, paper_id)
-    code_status = derive_code_status(rows, checked)
-    primary = next((row for row in rows if row.get("is_primary")), rows[0] if rows else None)
-    indexed_rows = [row for row in rows if row.get("status") == "indexed"]
+    active_rows = [row for row in rows if row.get("status") != "ignored"]
+    code_status = derive_code_status(active_rows, checked)
+    primary = next(
+        (row for row in active_rows if row.get("is_primary")),
+        active_rows[0] if active_rows else None,
+    )
+    indexed_rows = [row for row in active_rows if row.get("status") == "indexed"]
     meta["code_status"] = code_status
     if checked:
         meta["code_checked_at"] = utc_now()
-    meta["has_code"] = bool(rows)
+    meta["has_code"] = bool(active_rows)
     meta["code_repo_url"] = primary.get("repo_url") if primary else None
     meta["code_indexed"] = bool(indexed_rows)
     if meta.get("status") == "code_pending":

@@ -250,4 +250,8 @@ HANDLERS = {
     "resolve_paper": _handlers.resolve_paper,
     "read_paper_section": _handlers.read_paper_section,
     "search_paper_content": _handlers.search_paper_content,
+    # Internal management operations used by the authenticated local API/TUI.
+    # They are intentionally omitted from TOOL_DEFINITIONS.
+    "review_code_repository": _handlers.review_code_repository,
+    "delete_code_repository": _handlers.delete_code_repository,
 }

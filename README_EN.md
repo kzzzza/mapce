@@ -111,6 +111,18 @@ uv run --env-file .env mapce serve-restart
 
 Closing an MCP client leaves the background service running. `serve-kill` requests a graceful shutdown; `serve-kill --force` only targets the exact process whose identity passed the service health check.
 
+## Terminal Database Manager
+
+Run `mapce` without a subcommand to open the Textual TUI. It accesses the database only through the same local service, so the UI process does not load LanceDB or the embedding model.
+
+```bash
+uv run --env-file .env mapce
+```
+
+The five tabs cover dashboard, paper inventory, indexing, jobs, and system diagnostics. You can resolve a paper by internal ID or arXiv ID, inspect paper/code state, submit indexing and deletion jobs, review repository candidates, and inspect logs. Pressing `q` closes only the UI client and leaves the service running.
+
+For scripted management, use `mapce papers`, `mapce search`, `mapce index`, `mapce jobs`, `mapce stats`, and `mapce doctor`; run each command with `--help` for its options.
+
 ## Python SDK Quickstart
 
 ```python
@@ -133,7 +145,7 @@ results, _ = search_code('self-attention transformer implementation')
 
 | Doc | Content |
 |-----|---------|
-| [docs/usage.md](docs/usage.md) | Python SDK usage, MCP tool reference (11 tools), deep paper reading, Claude Code integration |
+| [docs/usage.md](docs/usage.md) | TUI/CLI, Python SDK, MCP tool reference (11 tools), deep paper reading, and Agent integration |
 | [docs/data-sources.md](docs/data-sources.md) | Data source adapters (arXiv, Zotero, local PDF, batch directory) |
 | [docs/storage.md](docs/storage.md) | Storage: LanceDB, model cache, temp files, cleanup |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | FAQ and solutions |
@@ -146,7 +158,7 @@ results, _ = search_code('self-attention transformer implementation')
 - [ ] **Code Retrieval Ranking**: The current code-file `Recall@5` baseline is approximately 0.65. Improve ranking with repository, file-path, symbol, and call-graph signals, backed by finer-grained evaluation sets for different languages.
 - [ ] **Code Analysis Enhancement**: Python uses AST parsing, while C++/CUDA still relies on regular expressions and cannot reliably handle template metaprogramming or complex macro expansion. Consider Tree-sitter or language-server integration, plus Makefile, Dockerfile, and shell support.
 - [ ] **Auto-Update Mechanism**: Detect new arXiv versions and repository commits, present changes for user confirmation, then apply incremental updates. Also refresh auxiliary indexes and retry failed jobs.
-- [ ] **Frontend UI**: The current interface is primarily MCP and CLI. Add a browser for papers, sections, figures, repository associations, and indexing states.
+- [x] **Terminal Management UI**: Added a lightweight Textual TUI for paper-state browsing, exact arXiv lookup, indexing jobs, repository review, confirmed deletion, logs, and diagnostics. TUI, CLI, and MCP reuse one singleton service.
 - [ ] **Deep Zotero Integration**: Go beyond PDF import by syncing Zotero notes, tags, and collections, or provide a Zotero Agent plugin.
 
 ## License

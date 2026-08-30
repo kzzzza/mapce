@@ -49,7 +49,8 @@ mapce/
 │   ├── application/             # 工具调度与串行写任务队列
 │   ├── service/                 # 单实例锁、HTTP 服务和进程生命周期
 │   ├── client/                  # CLI、TUI 与 stdio 代理共用的 HTTP 客户端
-│   ├── cli.py                   # 服务管理命令入口
+│   ├── cli.py                   # Typer CLI 与 TUI 启动入口
+│   ├── tui/                     # Textual 数据库管理界面与五个页签
 │   │
 │   ├── mineru/                  # MinerU API 封装
 │   │   ├── api.py               # httpx 实现
@@ -70,7 +71,7 @@ mapce/
 └── tests/
 ```
 
-生产环境中，同一个规范化 `MAPCE_DATA_DIR` 由一个后台服务持有。服务使用生命周期 `flock` 防止重复实例，并集中管理 LanceDB、按需加载的嵌入模型与串行写任务。CLI 和 stdio MCP 代理只通过本地 HTTP 客户端访问服务，导入时不会加载数据库或模型。
+生产环境中，同一个规范化 `MAPCE_DATA_DIR` 由一个后台服务持有。服务使用生命周期 `flock` 防止重复实例，并集中管理 LanceDB、按需加载的嵌入模型与串行写任务。TUI、CLI 和 stdio MCP 代理只通过本地 HTTP 客户端访问服务，导入时不会加载数据库或模型。TUI 专注数据库管理，Agent 读取论文正文仍走 MCP 的结构化工具。
 
 ### 索引流水线
 

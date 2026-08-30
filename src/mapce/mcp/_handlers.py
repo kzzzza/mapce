@@ -446,3 +446,17 @@ async def search_paper_content(
         _search_paper_content(paper_id, query, top_k=top_k),
         ensure_ascii=False,
     )
+
+
+async def review_code_repository(paper_id: str, repo_url: str, action: str) -> str:
+    """Apply a TUI repository review action through the shared write queue."""
+    from mapce.application.repositories import review_code_repository as _review
+
+    return json.dumps(_review(paper_id, repo_url, action), ensure_ascii=False)
+
+
+async def delete_code_repository(paper_id: str, repo_url: str) -> str:
+    """Delete one repository index through the shared write queue."""
+    from mapce.application.repositories import delete_code_repository as _delete
+
+    return json.dumps(_delete(paper_id, repo_url), ensure_ascii=False)

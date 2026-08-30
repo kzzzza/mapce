@@ -2,7 +2,42 @@
 
 # Usage
 
-MAPCE can be used via the Python SDK or Claude Code natural language interaction. MCP, the CLI, and the planned TUI share one local background service; the Python SDK remains available for development and maintenance scripts.
+MAPCE provides a TUI database manager, a scriptable CLI, MCP tools for Agents, and a Python SDK. TUI, CLI, and MCP share one local background service; the Python SDK remains available for development and maintenance scripts.
+
+## TUI Database Manager
+
+```bash
+uv run --env-file .env mapce
+```
+
+The TUI is a database-management and status-visualization interface. Paper understanding and note writing remain the responsibility of an Agent calling MAPCE over MCP.
+
+| Tab | Functions |
+|-----|-----------|
+| Dashboard | Service memory, paper/chunk counts, database size, code states, and auxiliary indexes |
+| Papers | Inventory and filters, exact internal/arXiv lookup, semantic search, abstract/outline/repository details, and confirmed deletion |
+| Index | Submit paper/code jobs, approve, ignore, or select repository candidates, and delete one repository index |
+| Jobs | Inspect serialized writes, cancel queued jobs, and retry failed jobs |
+| System | Paths, memory and index diagnostics, recent logs, reconnect, and confirmed service restart |
+
+The interface requires a terminal of at least 76×22. Pressing `q` closes only the TUI; use `mapce serve-kill` when the service itself should stop.
+
+## CLI Management Commands
+
+```bash
+uv run mapce papers list
+uv run mapce papers find 2412.04368 --json
+uv run mapce papers show 2412.04368
+uv run mapce search paper "diffusion policy" --top-k 10
+uv run mapce search content 2412.04368 "training objective"
+uv run mapce index paper 2501.00001 --type arxiv
+uv run mapce index code https://github.com/owner/repo --paper 2501.00001
+uv run mapce jobs list
+uv run mapce stats
+uv run mapce doctor
+```
+
+Indexing and deletion run through the serialized background queue. Commands with `--json` are suitable for scripts; run `uv run mapce <command> --help` for complete options.
 
 ## Python SDK
 
