@@ -6,11 +6,13 @@ into a single end-to-end pipeline for indexing a paper.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import unquote, urlparse
 
 from mapce.core.chunking.paper import chunk_paper
 from mapce.core.embedding import embed, embed_single
@@ -463,4 +465,35 @@ def index_paper_from_arxiv(
         pass
 
     # Index from already-parsed MinerU output (no re-upload)
+    return _index_from_mineru_dir(paper_dir, metadata, on_progress=on_progress)
+
+
+def index_paper_from_url(
+    url: str,
+    language: str = "en",
+    on_progress: Callable[[str, dict], None] | None = None,
+) -> str:
+    """Parse and index a paper from a public HTTP(S) PDF URL."""
+    from mapce.service.runtime import assert_database_write_allowed
+
+    assert_database_write_allowed()
+    from mapce.mineru.api import download_and_unpack, parse_from_url
+
+    if on_progress:
+        on_progress("mineru", {"status": "submitting_url", "url": url})
+    result = parse_from_url(url, language=language)
+    if result["state"] == "failed":
+        raise RuntimeError(f"MinerU URL parsing failed for {url}: {result.get('err_msg')}")
+
+    parsed = urlparse(url)
+    filename = unquote(Path(parsed.path).name) or "remote-paper.pdf"
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(filename).stem).strip("-._")
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:12]
+    data_id = f"{stem or 'remote-paper'}-{digest}"
+    cache_parent = _get_paper_cache_dir(data_id).parent
+    paper_dir = download_and_unpack(
+        {"data_id": data_id, "full_zip_url": result["full_zip_url"]},
+        cache_parent,
+    )
+    metadata = _extract_metadata_from_mineru(paper_dir, Path(filename))
     return _index_from_mineru_dir(paper_dir, metadata, on_progress=on_progress)

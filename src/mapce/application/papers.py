@@ -8,22 +8,17 @@ import json
 import logging
 import re
 from typing import Any
-from urllib.parse import unquote, urlparse
 
 import lancedb
 from lancedb.query import FullTextOperator, MatchQuery
 
+from mapce.paper_sources import normalize_arxiv_id
 from mapce.core.embedding import embed_single
 from mapce.core.vector_index import configure_vector_query, has_fts_index, has_vector_index
 from mapce.db import get_connection, sql_str
 
 logger = logging.getLogger("mapce.application.papers")
 
-_NEW_ARXIV_ID = re.compile(r"\d{4}\.\d{4,5}(?:v\d+)?", re.IGNORECASE)
-_LEGACY_ARXIV_ID = re.compile(
-    r"[a-z][a-z0-9.-]*(?:/[a-z][a-z0-9.-]*)?/\d{7}(?:v\d+)?",
-    re.IGNORECASE,
-)
 _ARXIV_LIKE = re.compile(r"(?:arxiv\s*:|https?://[^/]*arxiv\.org/|\d{4}\.\d)", re.IGNORECASE)
 
 _META_COLUMNS = [
@@ -56,31 +51,6 @@ _READ_COLUMNS = [
 ]
 _VECTOR_COLUMNS = [*_READ_COLUMNS, "_distance"]
 _FTS_COLUMNS = [*_READ_COLUMNS, "_score"]
-def normalize_arxiv_id(value: str) -> str | None:
-    """Normalize new and legacy arXiv references, removing version suffixes."""
-    candidate = value.strip()
-    if not candidate:
-        return None
-    if candidate.lower().startswith("arxiv:"):
-        candidate = candidate.split(":", 1)[1].strip()
-    elif "arxiv.org" in candidate.lower():
-        parsed = urlparse(candidate)
-        if parsed.hostname not in {"arxiv.org", "www.arxiv.org", "export.arxiv.org"}:
-            return None
-        path = unquote(parsed.path).strip("/")
-        if path.startswith("abs/"):
-            candidate = path[4:]
-        elif path.startswith("pdf/"):
-            candidate = path[4:]
-        else:
-            return None
-    candidate = candidate.strip().rstrip("/")
-    if candidate.lower().endswith(".pdf"):
-        candidate = candidate[:-4]
-    candidate = candidate.strip()
-    if not (_NEW_ARXIV_ID.fullmatch(candidate) or _LEGACY_ARXIV_ID.fullmatch(candidate)):
-        return None
-    return re.sub(r"v\d+$", "", candidate, flags=re.IGNORECASE)
 
 
 def _open_meta(db: lancedb.DBConnection) -> Any | None:

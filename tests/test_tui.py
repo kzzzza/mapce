@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+import threading
 
 import pytest
-from textual.widgets import Button, DataTable, Select, Static, TabbedContent
+from textual.widgets import Button, DataTable, Input, Select, Static, TabbedContent
 
 from mapce.tui.app import MapceTUI
 from mapce.tui.pages import PapersPane
@@ -117,6 +119,18 @@ class FakeClient:
         self.closed = True
 
 
+class BlockingSubmitClient(FakeClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.submit_started = threading.Event()
+        self.release_submit = threading.Event()
+
+    def submit_job(self, tool, arguments):
+        self.submit_started.set()
+        self.release_submit.wait(timeout=2)
+        return super().submit_job(tool, arguments)
+
+
 @pytest.mark.asyncio
 async def test_tui_renders_dashboard_and_keeps_service_running_on_exit():
     client = FakeClient()
@@ -149,6 +163,57 @@ async def test_exact_arxiv_lookup_uses_resolver_without_semantic_search():
         assert pane.rows[0]["paper_id"] == "paper-one"
         assert ("resolve_paper", {"identifier": "2412.04368"}) in client.calls
         assert not any(name == "search_papers" for name, _ in client.calls)
+
+
+@pytest.mark.asyncio
+async def test_index_source_type_follows_local_arxiv_and_url_input():
+    app = MapceTUI(client=FakeClient())
+    async with app.run_test(size=(120, 40)) as pilot:
+        app.query_one("#main-tabs", TabbedContent).active = "tab-index"
+        await pilot.pause()
+        source = app.query_one("#index-paper-source", Input)
+        source_type = app.query_one("#index-paper-type", Select)
+
+        source.value = (
+            "/Users/example/Downloads/evolution_of_humanoid_locomotion_control_1203.pdf"
+        )
+        await pilot.pause()
+        assert source_type.value == "local"
+
+        source.value = "arxiv2505.04961"
+        await pilot.pause()
+        assert source_type.value == "arxiv"
+
+        source.value = "https://example.org/paper.pdf"
+        await pilot.pause()
+        assert source_type.value == "url"
+
+
+@pytest.mark.asyncio
+async def test_paper_submit_button_blocks_duplicate_jobs():
+    client = BlockingSubmitClient()
+    app = MapceTUI(client=client)
+    async with app.run_test(size=(120, 40)) as pilot:
+        app.query_one("#main-tabs", TabbedContent).active = "tab-index"
+        await pilot.pause()
+        app.query_one("#index-paper-source", Input).value = "2505.04961"
+        await pilot.pause()
+
+        await pilot.click("#index-paper-submit")
+        assert await asyncio.to_thread(client.submit_started.wait, 1)
+        button = app.query_one("#index-paper-submit", Button)
+        assert button.disabled is True
+        await pilot.click("#index-paper-submit")
+        client.release_submit.set()
+        await pilot.pause()
+        await pilot.pause()
+
+        assert button.disabled is False
+        assert len(client.submitted) == 1
+        assert client.submitted[0] == (
+            "index_paper",
+            {"source": "2505.04961", "source_type": "arxiv", "language": "en"},
+        )
 
 
 @pytest.mark.asyncio

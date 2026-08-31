@@ -206,22 +206,48 @@ async def index_paper(
     language: str = "en",
 ) -> str:
     """Index a paper from a local PDF path, arXiv ID, or URL."""
+    from mapce.paper_sources import PaperSourceError, validate_paper_source
+
+    try:
+        detected = validate_paper_source(source, source_type)
+    except PaperSourceError as exc:
+        return json.dumps({
+            "status": "error",
+            "error_code": exc.error_code,
+            "message": str(exc),
+        })
+
     from mapce.core.indexing import index_paper as _index_paper
     from mapce.core.indexing import index_paper_from_arxiv
+    from mapce.core.indexing import index_paper_from_url
     from mapce.core.code_repositories import get_repository_associations
     from mapce.db import get_connection, get_meta, init_index_meta
 
     if source_type == "arxiv":
-        paper_id = index_paper_from_arxiv(arxiv_id=source, language=language)
-    elif source_type in ("local", "url"):
-        pdf_path = Path(source).expanduser()
-        if not pdf_path.exists():
+        paper_id = index_paper_from_arxiv(
+            arxiv_id=detected.normalized_source,
+            language=language,
+        )
+    elif source_type == "local":
+        pdf_path = Path(detected.normalized_source)
+        if not pdf_path.is_file():
             return json.dumps({
                 "status": "error",
                 "error_code": "file_not_found",
                 "message": f"File not found: {source}",
             })
+        if pdf_path.suffix.lower() != ".pdf":
+            return json.dumps({
+                "status": "error",
+                "error_code": "invalid_local_pdf",
+                "message": f"Local paper source is not a PDF file: {source}",
+            })
         paper_id = _index_paper(pdf_path=pdf_path, language=language)
+    elif source_type == "url":
+        paper_id = index_paper_from_url(
+            url=detected.normalized_source,
+            language=language,
+        )
     else:
         return json.dumps({
             "status": "error",

@@ -108,6 +108,34 @@ async def test_write_job_api_returns_trackable_job(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_mismatched_paper_source_is_rejected_before_queueing(tmp_path):
+    app = create_app(_info(tmp_path), "secret", dispatcher=FakeDispatcher())
+    transport = httpx.ASGITransport(app=app)
+    headers = {"Authorization": "Bearer secret"}
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://127.0.0.1:8765",
+            headers=headers,
+        ) as client:
+            submitted = await client.post(
+                "/api/jobs",
+                json={
+                    "tool": "index_paper",
+                    "arguments": {
+                        "source": "/tmp/evolution_of_humanoid_locomotion_control_1203.pdf",
+                        "source_type": "arxiv",
+                    },
+                },
+            )
+            jobs = await client.get("/api/jobs")
+
+    assert submitted.status_code == 400
+    assert submitted.json()["error_code"] == "source_type_mismatch"
+    assert jobs.json()["jobs"] == []
+
+
+@pytest.mark.asyncio
 async def test_diagnostics_and_bounded_logs_use_authenticated_api(tmp_path):
     info = _info(tmp_path)
     log_path = tmp_path / "service.log"

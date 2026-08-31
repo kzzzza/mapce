@@ -219,6 +219,26 @@ def create_app(
     async def submit_job(request: Request) -> JSONResponse:
         try:
             payload = JobSubmitRequest.model_validate(await request.json())
+            if payload.tool == "index_paper":
+                from mapce.paper_sources import (
+                    PaperSourceError,
+                    validate_paper_source,
+                )
+
+                try:
+                    validate_paper_source(
+                        str(payload.arguments.get("source", "")),
+                        str(payload.arguments.get("source_type", "local")),
+                    )
+                except PaperSourceError as exc:
+                    return JSONResponse(
+                        {
+                            "status": "error",
+                            "error_code": exc.error_code,
+                            "message": str(exc),
+                        },
+                        status_code=400,
+                    )
             job = await jobs.submit(payload.tool, payload.arguments)
         except ValueError as exc:
             return JSONResponse(

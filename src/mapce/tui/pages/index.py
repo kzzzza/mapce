@@ -11,6 +11,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from mapce.client import ServiceClientError
+from mapce.paper_sources import detect_paper_source
 
 from .common import ConfirmScreen
 
@@ -64,6 +65,13 @@ class IndexPane(Vertical):
         table = self.query_one("#repo-table", DataTable)
         table.add_columns("主仓库", "状态", "可信度", "来源", "仓库")
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "index-paper-source":
+            return
+        detected = detect_paper_source(event.value)
+        if detected is not None:
+            self.query_one("#index-paper-type", Select).value = detected.source_type
+
     def _set_actions(self, enabled: bool) -> None:
         for selector in ("#repo-approve", "#repo-ignore", "#repo-primary", "#repo-delete"):
             self.query_one(selector, Button).disabled = not enabled
@@ -89,19 +97,25 @@ class IndexPane(Vertical):
     async def submit_paper(self) -> None:
         source = self.query_one("#index-paper-source", Input).value.strip()
         message = self.query_one("#index-message", Static)
-        if not source:
-            message.update("请输入论文来源。")
-            return
-        arguments = {
-            "source": source,
-            "source_type": str(self.query_one("#index-paper-type", Select).value),
-            "language": str(self.query_one("#index-paper-language", Select).value),
-        }
+        button = self.query_one("#index-paper-submit", Button)
+        button.disabled = True
         try:
+            if not source:
+                message.update("请输入论文来源。")
+                return
+            detected = detect_paper_source(source)
+            normalized_source = detected.normalized_source if detected is not None else source
+            arguments = {
+                "source": normalized_source,
+                "source_type": str(self.query_one("#index-paper-type", Select).value),
+                "language": str(self.query_one("#index-paper-language", Select).value),
+            }
             payload = await asyncio.to_thread(self.app.api.submit_job, "index_paper", arguments)
             message.update(f"论文索引任务已提交：{payload.get('job', {}).get('job_id')}")
         except ServiceClientError as exc:
             message.update(f"提交失败 [{exc.error_code}]：{exc}")
+        finally:
+            button.disabled = False
 
     @work(exclusive=True, group="index-submit")
     async def submit_code(self) -> None:
@@ -206,6 +220,9 @@ class IndexPane(Vertical):
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         match event.button.id:
             case "index-paper-submit":
+                if event.button.disabled:
+                    return
+                event.button.disabled = True
                 self.submit_paper()
             case "index-code-submit":
                 self.submit_code()
