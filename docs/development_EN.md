@@ -62,7 +62,6 @@ mapce/
 │   │   ├── tools.py             # Tool definitions
 │   │   └── _handlers.py         # Async handlers
 │   │
-│   ├── prompts/                 # Jinja2 templates
 │   └── sources/                 # Data source adapters
 │       ├── arxiv.py
 │       ├── zotero.py

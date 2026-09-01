@@ -62,7 +62,6 @@ mapce/
 │   │   ├── tools.py             # 工具定义
 │   │   └── _handlers.py         # 异步 handler
 │   │
-│   ├── prompts/                 # Jinja2 模板
 │   └── sources/                 # 数据源适配器
 │       ├── arxiv.py
 │       ├── zotero.py
