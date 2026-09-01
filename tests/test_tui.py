@@ -86,6 +86,16 @@ class FakeClient:
                 "code_status": "indexed",
                 "sections": [{"heading": "1. Method"}],
                 "code_repositories": [],
+                "citation": {
+                    "doi": "10.1000/paper-one",
+                    "url": "https://doi.org/10.1000/paper-one",
+                    "citation_key": "Ada2024Paper",
+                    "plain_text": "Ada. Paper One. 2024.",
+                    "bibtex": "@misc{Ada2024Paper}",
+                    "csl_json": {"id": "paper-one", "title": "Paper One"},
+                    "verification_status": "stored_metadata_only",
+                    "missing_fields": [],
+                },
             }
         if name == "search_papers":
             return {
@@ -299,6 +309,24 @@ async def test_confirmed_paper_delete_submits_job_from_modal_worker():
         await pilot.pause()
 
     assert ("delete_paper", {"paper_id": "paper-one"}) in client.submitted
+
+
+@pytest.mark.asyncio
+async def test_paper_detail_displays_structured_citation():
+    app = MapceTUI(client=FakeClient())
+    async with app.run_test(size=(120, 40)) as pilot:
+        app.query_one("#main-tabs", TabbedContent).active = "tab-papers"
+        await pilot.pause()
+        table = app.query_one("#papers-table", DataTable)
+        table.focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+
+        content = str(app.query_one("#paper-detail", Static).content)
+        assert "10.1000/paper-one" in content
+        assert "@misc{Ada2024Paper}" in content
+        assert "stored_metadata_only" in content
 
 
 @pytest.mark.asyncio

@@ -62,6 +62,27 @@ SEARCH_CONTENT_OUTPUT_SCHEMA = {
     },
 }
 
+CITATION_OUTPUT_SCHEMA = {
+    **STATUS_OUTPUT_SCHEMA,
+    "properties": {
+        **STATUS_OUTPUT_SCHEMA["properties"],
+        "paper_id": {"type": "string"},
+        "title": {"type": "string"},
+        "authors": {"type": "array", "items": {"type": "string"}},
+        "year": {"type": ["integer", "null"]},
+        "venue": {"type": "string"},
+        "arxiv_id": {"type": ["string", "null"]},
+        "doi": {"type": ["string", "null"]},
+        "url": {"type": ["string", "null"]},
+        "citation_key": {"type": "string"},
+        "plain_text": {"type": "string"},
+        "bibtex": {"type": "string"},
+        "csl_json": {"type": "object"},
+        "verification_status": {"type": "string"},
+        "missing_fields": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
 
 # ---------------------------------------------------------------------------
 # Tool definitions (MCP types)
@@ -156,6 +177,21 @@ TOOL_DEFINITIONS = [
         outputSchema=STATUS_OUTPUT_SCHEMA,
     ),
     Tool(
+        name="get_paper_citation",
+        description=(
+            "Export one indexed paper's stored citation metadata as plain text, "
+            "BibTeX, and CSL-JSON without making a network request."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "paper_id": {"type": "string", "description": "Paper ID"},
+            },
+            "required": ["paper_id"],
+        },
+        outputSchema=CITATION_OUTPUT_SCHEMA,
+    ),
+    Tool(
         name="delete_paper",
         description="Remove a paper and all its associated chunks from the index.",
         inputSchema={
@@ -245,6 +281,7 @@ HANDLERS = {
     "index_code": _handlers.index_code,
     "list_indexed_papers": _handlers.list_indexed_papers,
     "get_paper_overview": _handlers.get_paper_overview,
+    "get_paper_citation": _handlers.get_paper_citation,
     "delete_paper": _handlers.delete_paper,
     "get_stats": _handlers.get_stats,
     "resolve_paper": _handlers.resolve_paper,

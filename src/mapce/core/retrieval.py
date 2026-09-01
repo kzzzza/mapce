@@ -954,6 +954,7 @@ def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) ->
         return None
 
     l1 = l1_rows[0]
+    from mapce.application.citations import build_paper_citation
     from mapce.core.code_repositories import get_repository_associations
     meta = get_meta(init_index_meta(db), paper_id)
     repositories = get_repository_associations(paper_id, db)
@@ -969,6 +970,7 @@ def get_paper_overview(paper_id: str, db: lancedb.DBConnection | None = None) ->
         "venue": l1.get("venue", ""),
         "arxiv_id": l1.get("arxiv_id"),
         "doi": l1.get("doi"),
+        "citation": build_paper_citation(l1),
         "code_status": (meta or {}).get(
             "code_status",
             "indexed" if (meta or {}).get("code_indexed") else "not_checked",

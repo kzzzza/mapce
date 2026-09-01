@@ -172,6 +172,18 @@ Every tool declares an `outputSchema`. New MCP clients receive `structuredConten
 
 > Show me the section structure and figure/table list for this paper
 
+The overview also returns a `citation` field identical to `get_paper_citation`. The TUI paper detail view displays its plain-text citation, BibTeX, CSL-JSON, DOI, URL, missing fields, and verification status.
+
+### get_paper_citation
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `paper_id` | string | yes | Unified ID of an indexed paper |
+
+Returns the title, authors, year, venue, DOI, and arXiv ID already stored in the local index, plus a stable citation key, plain-text citation, BibTeX, and CSL-JSON. It makes no network request. `verification_status=stored_metadata_only` means that an author should still verify the citation against the original paper or an authoritative metadata source.
+
+> Export BibTeX and CSL-JSON for paper 2412.04368
+
 ### resolve_paper
 
 | Parameter | Type | Required | Description |
@@ -208,6 +220,7 @@ This tool searches only the specified paper and can return multiple content chun
 ```text
 resolve_paper
   → get_paper_overview
+  → get_paper_citation
   → read_paper_section / search_paper_content
   → search_code (when indexed code exists)
   → Agent organizes an explanation or paper notes

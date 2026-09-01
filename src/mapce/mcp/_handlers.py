@@ -382,6 +382,13 @@ async def get_paper_overview(paper_id: str) -> str:
     return json.dumps({"status": "ok", **overview}, ensure_ascii=False)
 
 
+async def get_paper_citation(paper_id: str) -> str:
+    """Export stored paper metadata as plain text, BibTeX, and CSL-JSON."""
+    from mapce.application.citations import get_paper_citation as _get_citation
+
+    return json.dumps(_get_citation(paper_id), ensure_ascii=False)
+
+
 # ---------------------------------------------------------------------------
 # delete_paper
 # ---------------------------------------------------------------------------

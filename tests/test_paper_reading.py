@@ -7,6 +7,7 @@ import lancedb
 import pytest
 
 from mapce.application import papers
+from mapce.application.citations import get_paper_citation
 from mapce.core.retrieval import get_paper_overview
 from mapce.mcp import _handlers
 from mapce.db.schema import CHUNKS_SCHEMA, INDEX_META_SCHEMA
@@ -44,6 +45,8 @@ def _chunk(
     vector_value,
     year=None,
     venue=None,
+    arxiv_id=None,
+    doi=None,
 ):
     vector = [0.0] * 1024
     vector[0] = vector_value
@@ -60,6 +63,8 @@ def _chunk(
         authors=["Ada Researcher"],
         year=year,
         venue=venue,
+        arxiv_id=arxiv_id,
+        doi=doi,
         section_path=section_path,
         section_level=3 if chunk_type == "paper_l3" else 2,
         chunk_index=chunk_index,
@@ -82,7 +87,8 @@ def paper_db(tmp_path):
         [
             _chunk(
                 "p1-l1", "paper-one", "paper_l1", "", 0, "abstract", 0.1,
-                year=2024, venue="ICML",
+                year=2024, venue="ICML", arxiv_id="2412.04368",
+                doi="10.1000/paper-one",
             ),
             _chunk("p1-l2", "paper-one", "paper_l2", "1. Method", 0, "method section", 0.8),
             _chunk("p1-l3-a", "paper-one", "paper_l3", "1. Method", 1, "forward backward method", 1.0),
@@ -193,6 +199,46 @@ def test_overview_section_chunk_id_can_be_read_directly(paper_db):
 
     assert result["status"] == "ok"
     assert [row["chunk_id"] for row in result["chunks"]] == ["p1-l3-a", "p1-l3-b"]
+
+
+def test_overview_includes_the_same_structured_citation(paper_db):
+    overview = get_paper_overview("paper-one", db=paper_db)
+
+    assert overview["citation"]["citation_key"] == "Researcher2024Title"
+    assert overview["citation"]["doi"] == "10.1000/paper-one"
+    assert overview["citation"]["csl_json"]["DOI"] == "10.1000/paper-one"
+
+
+def test_get_paper_citation_exports_bibtex_and_csl_without_network(paper_db):
+    result = get_paper_citation("paper-one", db=paper_db)
+
+    assert result["status"] == "ok"
+    assert result["verification_status"] == "stored_metadata_only"
+    assert result["url"] == "https://doi.org/10.1000/paper-one"
+    assert "@misc{Researcher2024Title" in result["bibtex"]
+    assert "eprint = {2412.04368}" in result["bibtex"]
+    assert result["csl_json"]["author"] == [{"literal": "Ada Researcher"}]
+    assert result["missing_fields"] == []
+
+
+def test_get_paper_citation_reports_missing_paper(paper_db):
+    result = get_paper_citation("missing", db=paper_db)
+
+    assert result["error_code"] == "paper_not_found"
+
+
+@pytest.mark.asyncio
+async def test_get_paper_citation_mcp_handler_returns_structured_metadata(
+    paper_db, monkeypatch
+):
+    import mapce.application.citations as citations
+
+    monkeypatch.setattr(citations, "get_connection", lambda: paper_db)
+    payload = json.loads(await _handlers.get_paper_citation("paper-one"))
+
+    assert payload["status"] == "ok"
+    assert payload["citation_key"] == "Researcher2024Title"
+    assert payload["verification_status"] == "stored_metadata_only"
 
 
 def test_read_section_rejects_cursor_from_different_selector(paper_db):

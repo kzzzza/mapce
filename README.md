@@ -137,7 +137,7 @@ mapce
 
 | 文档 | 内容 |
 |------|------|
-| [docs/usage.md](docs/usage.md) | TUI/CLI、Python SDK、MCP 工具参考（11 个）、论文深度读取与 Agent 集成 |
+| [docs/usage.md](docs/usage.md) | TUI/CLI、Python SDK、MCP 工具参考（12 个）、论文深度读取与 Agent 集成 |
 | [docs/data-sources.md](docs/data-sources.md) | 数据源适配器（arXiv、Zotero、本地 PDF、目录批量） |
 | [docs/storage.md](docs/storage.md) | 存储形式：LanceDB、模型缓存、临时文件、清理 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题与解决方案 |

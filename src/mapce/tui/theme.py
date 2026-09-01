@@ -190,6 +190,10 @@ DataTable {
     overflow-y: auto;
 }
 
+#paper-detail {
+    height: 1fr;
+}
+
 .system-panel {
     height: 15;
     background: #111c2b;

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+import json
 from typing import Any
 
 from rich.markup import escape
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from mapce.client import ServiceClientError
@@ -63,7 +64,7 @@ class PapersPane(Vertical):
         with Horizontal(classes="split"):
             with Vertical(classes="split-left"):
                 yield DataTable(id="papers-table", cursor_type="row")
-            with VerticalScroll(classes="split-right"):
+            with Vertical(classes="split-right"):
                 yield Static("选择一篇论文查看摘要、章节目录、图表和仓库状态。", id="paper-detail")
                 yield Button("删除论文", id="paper-delete", variant="error", disabled=True)
         yield Static("", id="papers-message", classes="status-line")
@@ -266,12 +267,27 @@ class PapersPane(Vertical):
             for row in overview.get("code_repositories", [])
         ) or "  未发现仓库"
         abstract = escape(str(overview.get("abstract") or "")[:4000])
+        citation = overview.get("citation") or {}
+        citation_missing = ", ".join(citation.get("missing_fields") or []) or "无"
+        citation_text = escape(str(citation.get("plain_text") or "—"))
+        citation_url = escape(str(citation.get("url") or "—"))
+        citation_key = escape(str(citation.get("citation_key") or "—"))
+        bibtex = escape(str(citation.get("bibtex") or "—"))
+        csl_json = escape(json.dumps(citation.get("csl_json") or {}, ensure_ascii=False, indent=2))
         detail.update(
             f"[b]{escape(str(overview.get('title', '')))}[/b]\n"
             f"ID: {escape(paper_id)}\nArXiv: {escape(str(overview.get('arxiv_id') or '—'))}\n"
             f"作者: {authors}\n年份/Venue: {escape(str(overview.get('year') or '—'))} / "
             f"{escape(str(overview.get('venue') or '—'))}\n"
             f"代码状态: {escape(str(overview.get('code_status') or ''))}\n\n"
+            f"[b]引用信息[/b]\n"
+            f"DOI: {escape(str(citation.get('doi') or '—'))}\n"
+            f"URL: {citation_url}\nCitation Key: {citation_key}\n"
+            f"核验状态: {escape(str(citation.get('verification_status') or '—'))}\n"
+            f"缺失字段: {escape(citation_missing)}\n"
+            f"标准文本: {citation_text}\n\n"
+            f"[b]BibTeX[/b]\n{bibtex}\n\n"
+            f"[b]CSL-JSON[/b]\n{csl_json}\n\n"
             f"[b]摘要[/b]\n{abstract}\n\n[b]章节目录[/b]\n{sections}\n\n[b]代码仓库[/b]\n{repos}"
         )
 

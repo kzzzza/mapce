@@ -3,8 +3,11 @@ from mapce.mcp.tools import TOOL_DEFINITIONS
 
 
 def test_all_tools_publish_output_schemas():
-    assert len(TOOL_DEFINITIONS) == 11
+    assert len(TOOL_DEFINITIONS) == 12
     assert all(tool.outputSchema is not None for tool in TOOL_DEFINITIONS)
+
+    citation = next(tool for tool in TOOL_DEFINITIONS if tool.name == "get_paper_citation")
+    assert citation.outputSchema["properties"]["bibtex"]["type"] == "string"
 
 
 def test_mcp_result_has_structured_and_text_fallback():

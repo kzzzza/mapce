@@ -172,6 +172,18 @@ print(asyncio.run(list_indexed_papers()))
 
 > 帮我看看这篇论文的章节结构、图表清单
 
+论文概览还会返回 `citation` 字段，内容与 `get_paper_citation` 一致。TUI 论文详情会直接展示标准文本、BibTeX、CSL-JSON、DOI、URL、缺失字段和核验状态。
+
+### get_paper_citation
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `paper_id` | string | 是 | 已索引论文的统一 ID |
+
+返回本地索引中已有的标题、作者、年份、venue、DOI 和 arXiv ID，并生成稳定的 citation key、标准文本、BibTeX 和 CSL-JSON。该工具不联网，`verification_status=stored_metadata_only` 表示引用仍需由作者对照原始论文或权威元数据源核验。
+
+> 导出论文 2412.04368 的 BibTeX 和 CSL-JSON
+
 ### resolve_paper
 
 | 参数 | 类型 | 必填 | 说明 |
@@ -208,6 +220,7 @@ print(asyncio.run(list_indexed_papers()))
 ```text
 resolve_paper
   → get_paper_overview
+  → get_paper_citation
   → read_paper_section / search_paper_content
   → search_code（论文存在已索引代码时）
   → Agent 组织理解结果或论文笔记
