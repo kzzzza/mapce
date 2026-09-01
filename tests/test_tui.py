@@ -6,6 +6,7 @@ import threading
 
 import pytest
 from textual.widgets import Button, DataTable, Input, Select, Static, TabbedContent
+from textual.containers import VerticalScroll
 
 from mapce.tui.app import MapceTUI
 from mapce.tui.pages import PapersPane
@@ -327,6 +328,15 @@ async def test_paper_detail_displays_structured_citation():
         assert "10.1000/paper-one" in content
         assert "@misc{Ada2024Paper}" in content
         assert "stored_metadata_only" in content
+
+        scroller = app.query_one("#paper-detail-scroll", VerticalScroll)
+        assert scroller.can_focus is True
+        assert scroller.max_scroll_y > 0
+        scroller.focus()
+        await pilot.press("pagedown")
+        await pilot.pause()
+        assert scroller.scroll_y > 0
+        assert app.query_one("#paper-delete", Button).region.bottom <= app.screen.region.bottom
 
 
 @pytest.mark.asyncio

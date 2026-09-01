@@ -10,7 +10,7 @@ from typing import Any
 from rich.markup import escape
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from mapce.client import ServiceClientError
@@ -65,7 +65,8 @@ class PapersPane(Vertical):
             with Vertical(classes="split-left"):
                 yield DataTable(id="papers-table", cursor_type="row")
             with Vertical(classes="split-right"):
-                yield Static("选择一篇论文查看摘要、章节目录、图表和仓库状态。", id="paper-detail")
+                with VerticalScroll(id="paper-detail-scroll"):
+                    yield Static("选择一篇论文查看摘要、章节目录、图表和仓库状态。", id="paper-detail")
                 yield Button("删除论文", id="paper-delete", variant="error", disabled=True)
         yield Static("", id="papers-message", classes="status-line")
 

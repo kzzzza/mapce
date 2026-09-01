@@ -186,12 +186,16 @@ DataTable {
     margin-left: 1;
 }
 
-#system-output, #system-logs, #paper-detail {
+#system-output, #system-logs, #paper-detail-scroll {
     overflow-y: auto;
 }
 
-#paper-detail {
+#paper-detail-scroll {
     height: 1fr;
+}
+
+#paper-detail {
+    height: auto;
 }
 
 .system-panel {
