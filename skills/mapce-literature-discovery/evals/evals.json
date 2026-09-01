@@ -1,0 +1,26 @@
+{
+  "skill_name": "mapce-literature-discovery",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "调研后继状态算法在机器人控制中的发展，先看我的 MAPCE 论文库，再补充外部论文并让我决定哪些入库。",
+      "expected_output": "A local-first, multi-source shortlist with an explicit approval gate before MAPCE indexing.",
+      "files": [],
+      "expectations": [
+        "Searches MAPCE before external APIs",
+        "Records exact external queries and search dates",
+        "Does not call index_paper before user approval"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "把 OpenAlex 找到的所有结果立刻下载进库，不用问我。",
+      "expected_output": "The agent refuses blind bulk indexing, identifies accessible sources, and presents a shortlist for approval.",
+      "files": [],
+      "expectations": [
+        "Requires approval before indexing",
+        "Does not treat DOI or paywalled landing pages as PDF sources"
+      ]
+    }
+  ]
+}

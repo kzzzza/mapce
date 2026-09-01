@@ -121,6 +121,23 @@ mapce serve-restart  # 重启服务
 
 退出 MCP 客户端不会停止后台服务。只有 `serve-kill` 会请求停止；`serve-kill --force` 只用于已经通过健康检查验证身份的准确进程。
 
+## 科研工作流 Skills
+
+MAPCE 附带六个可安装 Skill，用于论文发现、单篇深读、文献综述、实验设计和科研写作。Skill 通过 MCP 使用同一个后台服务，不会直接打开 LanceDB，也不会在 Agent 进程中重复加载嵌入模型。
+
+```bash
+mapce skills list
+mapce skills install --target codex
+mapce skills install --target claude
+mapce skills install --target agents
+# 其他 Agent 使用自定义目录
+mapce skills install --path /path/to/agent/skills
+```
+
+安装采用复制和校验值保护。重复安装相同版本不会产生变化；升级使用 `--update`，检测到用户修改时会停止并返回冲突文件。研究笔记和论文草稿默认写入实际工作目录的 `research/<项目名>/`，写入前由 Agent 询问用户是否采用该目录。
+
+完整工作流、产物结构和证据状态说明见 [docs/research-skills.md](docs/research-skills.md)。
+
 ## 终端数据库管理界面
 
 不带子命令运行 `mapce` 会打开 Textual TUI。它只通过同一个本地后台服务访问数据库，不会在界面进程中加载 LanceDB 或嵌入模型。
@@ -142,6 +159,7 @@ mapce
 | [docs/storage.md](docs/storage.md) | 存储形式：LanceDB、模型缓存、临时文件、清理 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题与解决方案 |
 | [docs/development.md](docs/development.md) | 开发指南（架构、分块策略、项目结构、添加数据源） |
+| [docs/research-skills.md](docs/research-skills.md) | 科研工作流 Skill 安装、论文发现、证据台账、综述与写作 |
 
 ## MAPCE TODO
 
@@ -151,6 +169,7 @@ mapce
 - [ ] **代码分析增强**：Python 使用 AST 解析，C++/CUDA 仍依赖正则，暂不能可靠处理模板元编程和复杂宏展开。后续考虑接入 Tree-sitter 或语言服务器，并支持 Makefile、Dockerfile、Shell 等文件
 - [ ] **自动更新机制**：检测 arXiv 新版本和代码仓库新 commit，先展示变化，再由用户确认是否增量同步；同时加入辅助索引刷新和失败任务重试
 - [x] **终端管理界面**：提供轻量 Textual TUI，用于论文状态浏览、arXiv 精确查找、索引任务、候选仓库审核、删除确认、后台日志和系统诊断；TUI、CLI 与 MCP 共用单一后台服务
+- [x] **科研工作流 Skills**：提供论文发现、单篇深读、快速或 PRISMA 式综述、实验设计和证据约束写作；支持安装到多种 Agent，并在索引新论文前要求用户确认
 - [ ] **Zotero 深度集成**：在 PDF 导入之外，同步 Zotero 笔记、标签和集合，或提供 Zotero Agent 插件
 
 ## 许可

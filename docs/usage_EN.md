@@ -45,6 +45,17 @@ mapce stats
 mapce doctor
 ```
 
+The research workflow skills can be installed without loading `.env` or starting the service:
+
+```bash
+mapce skills list
+mapce skills install --target codex
+mapce skills status --target codex
+mapce skills install --target codex --update
+```
+
+Use `--target claude`, `--target agents`, or `--path` for another Agent skill directory. See [research-skills.md](research-skills.md) for the full workflow.
+
 Indexing and deletion run through the serialized background queue. Commands with `--json` are suitable for scripts; run `mapce <command> --help` for complete options.
 
 ## Python SDK

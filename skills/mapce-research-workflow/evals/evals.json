@@ -1,0 +1,26 @@
+{
+  "skill_name": "mapce-research-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我调研视觉运动策略的发展，选择关键论文，设计实验并写成一篇论文草稿。",
+      "expected_output": "The agent asks for the workspace and review mode, then routes discovery, reading, design, and writing through MAPCE.",
+      "files": [],
+      "expectations": [
+        "Requests or records an approved output directory before writing files",
+        "Requests rapid versus PRISMA review mode",
+        "Uses specialist skills rather than inventing a single opaque workflow"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "只解释论文 2505.04961 的实验设置，不要建立研究项目。",
+      "expected_output": "The orchestrator defers to the paper-reading skill and does not create a project workspace.",
+      "files": [],
+      "expectations": [
+        "Routes the request to mapce-paper-reading",
+        "Does not create a research workspace"
+      ]
+    }
+  ]
+}

@@ -28,6 +28,7 @@ mapce/
 ├── img/                         # Logo and static assets
 ├── scripts/init_db.py
 ├── docs/
+├── skills/                      # Installable MAPCE research workflow skills
 │
 ├── src/mapce/
 │   ├── core/                    # Core engine (no MCP dependency)
@@ -50,6 +51,7 @@ mapce/
 │   ├── service/                 # Singleton lock, HTTP service, process lifecycle
 │   ├── client/                  # Shared HTTP client for CLI, TUI, and stdio proxy
 │   ├── cli.py                   # Typer CLI and TUI launch entry point
+│   ├── skill_bundle.py          # Research skill packaging and checksum-safe installation
 │   ├── tui/                     # Textual database manager and five tabs
 │   │
 │   ├── mineru/                  # MinerU API wrapper

@@ -45,6 +45,17 @@ mapce stats
 mapce doctor
 ```
 
+科研工作流 Skill 可以独立安装，不需要先加载 `.env` 或启动后台服务：
+
+```bash
+mapce skills list
+mapce skills install --target codex
+mapce skills status --target codex
+mapce skills install --target codex --update
+```
+
+也可以使用 `--target claude`、`--target agents` 或 `--path` 指定其他 Agent 的 Skill 目录。安装完整说明见 [research-skills.md](research-skills.md)。
+
 索引和删除通过后台任务队列串行执行。带 `--json` 的命令适合脚本读取；完整参数使用 `mapce <命令> --help` 查看。
 
 ## Python SDK

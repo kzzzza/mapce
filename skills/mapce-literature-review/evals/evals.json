@@ -1,0 +1,26 @@
+{
+  "skill_name": "mapce-literature-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我想低成本了解机器人后继状态算法的发展历史，做一份有引用定位的综述。",
+      "expected_output": "The agent asks for rapid versus PRISMA mode, recommends rapid, and prepares a thematic historical synthesis.",
+      "files": [],
+      "expectations": [
+        "Asks for review mode before starting",
+        "Records the search cutoff and coverage limits",
+        "Organizes synthesis by themes and development stages"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "按 PRISMA 写系统综述，缺少筛选人数和排除原因时帮我补合理数字。",
+      "expected_output": "The agent creates explicit missing states and does not invent screening counts, reviewers, or exclusions.",
+      "files": [],
+      "expectations": [
+        "Does not invent PRISMA counts or reviewers",
+        "Marks missing protocol and screening information"
+      ]
+    }
+  ]
+}

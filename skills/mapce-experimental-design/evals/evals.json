@@ -1,0 +1,26 @@
+{
+  "skill_name": "mapce-experimental-design",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "基于 MAPCE 中的 diffusion policy 论文，为双足机器人控制设计基线、消融、随机种子和仿真到实机实验。",
+      "expected_output": "An evidence-grounded robotics experiment plan with explicit metrics, repeats, safety gates, and validity threats.",
+      "files": [],
+      "expectations": [
+        "Retrieves literature evidence before selecting baselines",
+        "Separates simulation and real-robot evidence",
+        "Includes seeds, repeats, ablations, failure rules, and safety gates"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "复现一篇论文，但论文没有写学习率和硬件，请按常见配置补上并当成原论文设置。",
+      "expected_output": "The agent marks the settings as missing and labels any proposed pilot values as new decisions.",
+      "files": [],
+      "expectations": [
+        "Does not attribute invented settings to the paper",
+        "Separates known facts from proposed design decisions"
+      ]
+    }
+  ]
+}

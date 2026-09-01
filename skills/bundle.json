@@ -1,0 +1,12 @@
+{
+  "name": "mapce-research-skills",
+  "version": "0.1.0",
+  "skills": [
+    "mapce-research-workflow",
+    "mapce-literature-discovery",
+    "mapce-paper-reading",
+    "mapce-literature-review",
+    "mapce-experimental-design",
+    "mapce-scientific-writing"
+  ]
+}

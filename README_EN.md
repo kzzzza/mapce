@@ -121,6 +121,22 @@ mapce serve-restart
 
 Closing an MCP client leaves the background service running. `serve-kill` requests a graceful shutdown; `serve-kill --force` only targets the exact process whose identity passed the service health check.
 
+## Research Workflow Skills
+
+MAPCE bundles six installable skills for paper discovery, deep reading, literature reviews, experimental design, and evidence-grounded scientific writing. They use the singleton MAPCE service over MCP and never open LanceDB or load a second embedding model inside the Agent process.
+
+```bash
+mapce skills list
+mapce skills install --target codex
+mapce skills install --target claude
+mapce skills install --target agents
+mapce skills install --path /path/to/agent/skills
+```
+
+Installation copies files with checksum protection. Reinstalling the same version is idempotent; `--update` stops when it finds user-modified files. The Agent asks before creating the proposed `research/<project-name>/` workspace in the active working directory.
+
+See [docs/research-skills.md](docs/research-skills.md) for the workflow, outputs, and evidence states.
+
 ## Terminal Database Manager
 
 Run `mapce` without a subcommand to open the Textual TUI. It accesses the database only through the same local service, so the UI process does not load LanceDB or the embedding model.
@@ -160,6 +176,7 @@ results, _ = search_code('self-attention transformer implementation')
 | [docs/storage.md](docs/storage.md) | Storage: LanceDB, model cache, temp files, cleanup |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | FAQ and solutions |
 | [docs/development.md](docs/development.md) | Development guide (architecture, chunking strategy, project structure) |
+| [docs/research-skills.md](docs/research-skills.md) | Research skill installation, discovery, evidence records, reviews, and writing |
 
 ## MAPCE TODO
 
@@ -169,6 +186,7 @@ results, _ = search_code('self-attention transformer implementation')
 - [ ] **Code Analysis Enhancement**: Python uses AST parsing, while C++/CUDA still relies on regular expressions and cannot reliably handle template metaprogramming or complex macro expansion. Consider Tree-sitter or language-server integration, plus Makefile, Dockerfile, and shell support.
 - [ ] **Auto-Update Mechanism**: Detect new arXiv versions and repository commits, present changes for user confirmation, then apply incremental updates. Also refresh auxiliary indexes and retry failed jobs.
 - [x] **Terminal Management UI**: Added a lightweight Textual TUI for paper-state browsing, exact arXiv lookup, indexing jobs, repository review, confirmed deletion, logs, and diagnostics. TUI, CLI, and MCP reuse one singleton service.
+- [x] **Research Workflow Skills**: Added paper discovery, deep reading, rapid or PRISMA-style reviews, experimental design, and evidence-constrained writing. Skills install into multiple Agent environments and require approval before indexing new papers.
 - [ ] **Deep Zotero Integration**: Go beyond PDF import by syncing Zotero notes, tags, and collections, or provide a Zotero Agent plugin.
 
 ## License

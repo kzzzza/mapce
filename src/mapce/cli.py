@@ -38,11 +38,13 @@ search_app = typer.Typer(help="Search papers or content inside one paper.")
 index_app = typer.Typer(help="Submit paper and code indexing jobs.")
 jobs_app = typer.Typer(help="Inspect and cancel background jobs.")
 config_app = typer.Typer(help="Manage persistent MAPCE user configuration.")
+skills_app = typer.Typer(help="Install the bundled MAPCE research skills.")
 app.add_typer(papers_app, name="papers")
 app.add_typer(search_app, name="search")
 app.add_typer(index_app, name="index")
 app.add_typer(jobs_app, name="jobs")
 app.add_typer(config_app, name="config")
+app.add_typer(skills_app, name="skills")
 
 console = Console()
 error_console = Console(stderr=True)
@@ -108,7 +110,7 @@ def root(
     data_dir: Path | None = typer.Option(None, "--data-dir", help="Override MAPCE_DATA_DIR."),
 ) -> None:
     """Open the database manager when no subcommand is given."""
-    if ctx.invoked_subcommand != "config":
+    if ctx.invoked_subcommand not in {"config", "skills"}:
         try:
             load_configured_env(strict=True)
         except ConfigurationError as exc:
@@ -162,6 +164,59 @@ def config_unset_env() -> None:
         },
         True,
     )
+
+
+def _skill_error(exc: Exception) -> None:
+    payload = {
+        "status": "error",
+        "error_code": getattr(exc, "error_code", "skill_command_failed"),
+        "message": str(exc),
+    }
+    conflicts = getattr(exc, "conflicts", None)
+    if conflicts:
+        payload["conflicts"] = conflicts
+    error_console.print_json(json.dumps(payload, ensure_ascii=False))
+    raise typer.Exit(1)
+
+
+@skills_app.command("list")
+def skills_list() -> None:
+    """List the research skills included with this MAPCE installation."""
+    from mapce.skill_bundle import SkillBundleError, bundle_summary
+
+    try:
+        _emit(bundle_summary(), True)
+    except SkillBundleError as exc:
+        _skill_error(exc)
+
+
+@skills_app.command("install")
+def skills_install(
+    target: str | None = typer.Option(None, "--target"),
+    path: Path | None = typer.Option(None, "--path"),
+    update: bool = typer.Option(False, "--update"),
+) -> None:
+    """Copy the full research skill bundle into one agent skill directory."""
+    from mapce.skill_bundle import SkillBundleError, install_bundle
+
+    try:
+        _emit(install_bundle(target=target, path=path, update=update), True)
+    except SkillBundleError as exc:
+        _skill_error(exc)
+
+
+@skills_app.command("status")
+def skills_status(
+    target: str | None = typer.Option(None, "--target"),
+    path: Path | None = typer.Option(None, "--path"),
+) -> None:
+    """Compare installed research skills with the bundled version."""
+    from mapce.skill_bundle import SkillBundleError, bundle_status
+
+    try:
+        _emit(bundle_status(target=target, path=path), True)
+    except SkillBundleError as exc:
+        _skill_error(exc)
 
 
 @app.command("serve")

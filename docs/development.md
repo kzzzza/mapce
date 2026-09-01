@@ -28,6 +28,7 @@ mapce/
 ├── img/                         # Logo 等静态资源
 ├── scripts/init_db.py
 ├── docs/
+├── skills/                      # 可安装的 MAPCE 科研工作流 Skill 套件
 │
 ├── src/mapce/
 │   ├── core/                    # 核心引擎（无 MCP 依赖）
@@ -50,6 +51,7 @@ mapce/
 │   ├── service/                 # 单实例锁、HTTP 服务和进程生命周期
 │   ├── client/                  # CLI、TUI 与 stdio 代理共用的 HTTP 客户端
 │   ├── cli.py                   # Typer CLI 与 TUI 启动入口
+│   ├── skill_bundle.py          # 科研 Skill 打包、安装与校验值保护
 │   ├── tui/                     # Textual 数据库管理界面与五个页签
 │   │
 │   ├── mineru/                  # MinerU API 封装

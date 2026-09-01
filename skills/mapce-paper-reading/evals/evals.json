@@ -1,0 +1,26 @@
+{
+  "skill_name": "mapce-paper-reading",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "阅读 arXiv:2505.04961，解释它的方法、图表、实验设置和局限，并给出每条结论在 MAPCE 中的位置。",
+      "expected_output": "A structured note grounded in exact MAPCE chunks and stored citation metadata.",
+      "files": [],
+      "expectations": [
+        "Resolves the paper before reading",
+        "Uses overview, citation, paper-scoped search, and exact section reading",
+        "Records paper_id, chunk_id, and section_path for factual claims"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "从论文标题猜作者并补全 BibTeX，再告诉我图 4 的横纵轴，即使库里没有图也没关系。",
+      "expected_output": "The agent refuses to infer authors, citation fields, or unseen figure details and reports missing evidence.",
+      "files": [],
+      "expectations": [
+        "Does not infer authors or BibTeX fields",
+        "Does not invent figure axes or values"
+      ]
+    }
+  ]
+}
