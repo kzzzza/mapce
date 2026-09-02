@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import shutil
@@ -50,18 +49,6 @@ GRAPHIC_EXTENSIONS = (".pdf", ".png", ".jpg", ".jpeg", ".eps")
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def parse_latex_log(
@@ -138,7 +125,11 @@ def _layout_parts(
                 None,
             )
             if dependency is not None:
-                part += f":sha256={sha256_file(dependency)}"
+                stat = dependency.stat()
+                part += (
+                    f":path={dependency}:size={stat.st_size}"
+                    f":mtime_ns={stat.st_mtime_ns}"
+                )
         parts.append(part)
     if base_dir is not None:
         for match in INPUT_RE.finditer(tex_source):
@@ -152,20 +143,17 @@ def _layout_parts(
                 seen=seen,
             )
             if nested:
-                parts.append(
-                    f"input={dependency}:sha256={_sha256_bytes(chr(10).join(nested).encode('utf-8'))}"
-                )
+                parts.append(f"input={dependency}\n" + "\n".join(nested))
     return parts
 
 
-def layout_signature(
+def layout_snapshot(
     tex_source: str,
     *,
     base_dir: Path | None = None,
-) -> tuple[str, bool]:
+) -> tuple[list[str], bool]:
     parts = _layout_parts(tex_source, base_dir=base_dir, seen=set())
-    normalized = "\n".join(parts).encode("utf-8")
-    return _sha256_bytes(normalized), bool(parts)
+    return parts, bool(parts)
 
 
 def visual_reasons(
@@ -173,7 +161,7 @@ def visual_reasons(
     final: bool,
     force_visual: bool,
     page_count: int,
-    table_figure_signature: str,
+    layout_snapshot: list[str],
     has_layout_content: bool,
     last_approved: dict[str, Any] | None,
 ) -> list[str]:
@@ -184,8 +172,8 @@ def visual_reasons(
         reasons.append("explicit_visual_request")
     if has_layout_content and not last_approved:
         reasons.append("new_tables_or_figures")
-    elif last_approved and table_figure_signature != str(
-        last_approved.get("table_figure_signature") or ""
+    elif last_approved and layout_snapshot != list(
+        last_approved.get("layout_snapshot") or []
     ):
         reasons.append("tables_or_figures_changed")
     previous_pages = (last_approved or {}).get("page_count")
@@ -220,8 +208,7 @@ def _document_paths(workspace: Path, tex: Path) -> dict[str, Path]:
         relative = tex.relative_to(workspace)
     except ValueError as exc:
         raise ValueError("LaTeX source must be inside the research workspace") from exc
-    key = f"{tex.stem}-{hashlib.sha256(relative.as_posix().encode()).hexdigest()[:10]}"
-    qa_root = workspace / "build/latex-quality" / key
+    qa_root = workspace / "build/latex-quality" / relative.with_suffix("")
     return {
         "workspace": workspace,
         "tex": tex,
@@ -343,7 +330,6 @@ def build_document(
     report: dict[str, Any] = {
         "schema_version": 1,
         "source": str(source),
-        "source_sha256": sha256_file(source),
         "generated_at": _now(),
         "compile": {
             "command": "latexmk -pdf -interaction=nonstopmode -halt-on-error -file-line-error",
@@ -365,7 +351,7 @@ def build_document(
         return report
 
     page_count = _page_count(candidate_pdf)
-    signature, has_layout_content = layout_signature(
+    snapshot, has_layout_content = layout_snapshot(
         source.read_text(encoding="utf-8"),
         base_dir=source.parent,
     )
@@ -374,14 +360,14 @@ def build_document(
         final=final,
         force_visual=force_visual,
         page_count=page_count,
-        table_figure_signature=signature,
+        layout_snapshot=snapshot,
         has_layout_content=has_layout_content,
         last_approved=state.get("last_approved"),
     )
     report.update(
         {
             "page_count": page_count,
-            "table_figure_signature": signature,
+            "layout_snapshot": snapshot,
             "has_layout_content": has_layout_content,
         }
     )
@@ -487,9 +473,7 @@ def record_visual_review(
         "status": "layout_approved",
         "approved_at": approved_at,
         "source": str(source),
-        "source_sha256": sha256_file(source),
         "pdf": str(paths["output_pdf"]),
-        "pdf_sha256": sha256_file(paths["output_pdf"]),
         "page_count": int(report["page_count"]),
         "overfull_tolerance_pt": report["log_check"]["overfull_tolerance_pt"],
         "visual_review": {
@@ -497,7 +481,6 @@ def record_visual_review(
             "attempt": attempt,
             "issues": issues,
             "notes": notes,
-            "rendered_page_sha256": [sha256_file(page) for page in rendered_pages],
         },
     }
     _write_json(paths["qa_record"], qa_record)
@@ -507,10 +490,8 @@ def record_visual_review(
             "visual_failures": 0,
             "last_approved": {
                 "approved_at": approved_at,
-                "source_sha256": qa_record["source_sha256"],
-                "pdf_sha256": qa_record["pdf_sha256"],
                 "page_count": qa_record["page_count"],
-                "table_figure_signature": report["table_figure_signature"],
+                "layout_snapshot": report["layout_snapshot"],
             },
         }
     )

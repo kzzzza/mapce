@@ -4,7 +4,7 @@ description: Draft, revise, and audit scientific reviews or research papers with
 license: MIT
 compatibility: Requires MAPCE MCP and a MAPCE research workspace. LaTeX output requires latexmk, pdfinfo, pdftoppm, and an image-viewing tool.
 metadata:
-  version: "0.1.1"
+  version: "0.1.2"
 ---
 
 # MAPCE Scientific Writing
@@ -57,8 +57,9 @@ twice. Leave the result pending for human review when the image-viewing tool is 
 or three visual inspections fail.
 
 Do not call a PDF layout-approved, complete, final, or ready for delivery until the
-corresponding `.layout-qa.json` says `status=layout_approved` and its source/PDF hashes
-match the current files. Layout approval does not remove the scientific DRAFT state.
+corresponding `.layout-qa.json` says `status=layout_approved`. Generate a new approval
+record after subsequent LaTeX or PDF changes. Layout approval does not remove the
+scientific DRAFT state.
 
 ## Audit
 

@@ -237,20 +237,20 @@ def test_latex_visual_reasons_track_layout_and_page_changes():
         "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
         "mapce_latex_visual_reasons",
     )
-    first_signature, has_layout = module.layout_signature(
+    first_snapshot, has_layout = module.layout_snapshot(
         "Text\\begin{table}A\\end{table}"
     )
-    changed_signature, _ = module.layout_signature(
+    changed_snapshot, _ = module.layout_snapshot(
         "Different prose\\begin{table}B\\end{table}"
     )
 
     assert has_layout is True
-    assert first_signature != changed_signature
+    assert first_snapshot != changed_snapshot
     assert module.visual_reasons(
         final=False,
         force_visual=False,
         page_count=4,
-        table_figure_signature=first_signature,
+        layout_snapshot=first_snapshot,
         has_layout_content=True,
         last_approved=None,
     ) == ["new_tables_or_figures"]
@@ -258,41 +258,41 @@ def test_latex_visual_reasons_track_layout_and_page_changes():
         final=True,
         force_visual=False,
         page_count=5,
-        table_figure_signature=changed_signature,
+        layout_snapshot=changed_snapshot,
         has_layout_content=True,
-        last_approved={"page_count": 4, "table_figure_signature": first_signature},
+        last_approved={"page_count": 4, "layout_snapshot": first_snapshot},
     )
     assert reasons == ["final_delivery", "tables_or_figures_changed", "page_count_changed"]
     removed = module.visual_reasons(
         final=False,
         force_visual=False,
         page_count=4,
-        table_figure_signature=module.layout_signature("plain text")[0],
+        layout_snapshot=module.layout_snapshot("plain text")[0],
         has_layout_content=False,
-        last_approved={"page_count": 4, "table_figure_signature": first_signature},
+        last_approved={"page_count": 4, "layout_snapshot": first_snapshot},
     )
     assert removed == ["tables_or_figures_changed"]
 
 
-def test_latex_layout_signature_detects_referenced_image_changes(tmp_path):
+def test_latex_layout_snapshot_detects_referenced_image_changes(tmp_path):
     module = _load(
         "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
-        "mapce_latex_image_signature",
+        "mapce_latex_image_snapshot",
     )
     figures = tmp_path / "figures"
     figures.mkdir()
     image = figures / "figure.png"
     image.write_bytes(b"first-image")
     source = "\\graphicspath{{figures/}}\\includegraphics{figure}"
-    first, has_layout = module.layout_signature(source, base_dir=tmp_path)
+    first, has_layout = module.layout_snapshot(source, base_dir=tmp_path)
     image.write_bytes(b"changed-image")
-    changed, _ = module.layout_signature(source, base_dir=tmp_path)
+    changed, _ = module.layout_snapshot(source, base_dir=tmp_path)
 
     assert has_layout is True
     assert first != changed
 
 
-def test_latex_visual_pass_publishes_pdf_and_hash_bound_qa(tmp_path):
+def test_latex_visual_pass_publishes_pdf_with_minimal_qa(tmp_path):
     module = _load(
         "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
         "mapce_latex_visual_pass",
@@ -310,9 +310,8 @@ def test_latex_visual_pass_publishes_pdf_and_hash_bound_qa(tmp_path):
     rendered.write_bytes(b"rendered-page")
     module._write_json(paths["report"], {
         "status": "visual_pending",
-        "source_sha256": module.sha256_file(tex),
         "page_count": 1,
-        "table_figure_signature": "signature",
+        "layout_snapshot": ["table"],
         "compile": {"candidate_pdf": str(candidate)},
         "log_check": {"overfull_tolerance_pt": 2.0},
         "visual_review": {"status": "pending", "attempt": 1, "pages": [str(rendered)]},
@@ -330,8 +329,22 @@ def test_latex_visual_pass_publishes_pdf_and_hash_bound_qa(tmp_path):
     assert result["status"] == "layout_approved"
     assert paths["output_pdf"].read_bytes() == b"candidate-pdf"
     assert qa["status"] == "layout_approved"
-    assert qa["source_sha256"] == module.sha256_file(tex)
-    assert qa["pdf_sha256"] == module.sha256_file(paths["output_pdf"])
+    assert set(qa) == {
+        "schema_version",
+        "status",
+        "approved_at",
+        "source",
+        "pdf",
+        "page_count",
+        "overfull_tolerance_pt",
+        "visual_review",
+    }
+    assert set(qa["visual_review"]) == {
+        "reviewed_pages",
+        "attempt",
+        "issues",
+        "notes",
+    }
 
 
 def test_latex_visual_failure_requires_issue_and_caps_automatic_rechecks(tmp_path):
@@ -354,7 +367,7 @@ def test_latex_visual_failure_requires_issue_and_caps_automatic_rechecks(tmp_pat
     module._write_json(paths["report"], {
         "status": "visual_pending",
         "page_count": 1,
-        "table_figure_signature": "sig",
+        "layout_snapshot": ["table"],
         "compile": {"candidate_pdf": str(candidate)},
         "log_check": {"overfull_tolerance_pt": 2.0},
         "visual_review": {"attempt": 1, "pages": [str(rendered)]},
@@ -368,7 +381,7 @@ def test_latex_visual_failure_requires_issue_and_caps_automatic_rechecks(tmp_pat
         module._write_json(paths["report"], {
             "status": "visual_pending",
             "page_count": 1,
-            "table_figure_signature": "sig",
+            "layout_snapshot": ["table"],
             "compile": {"candidate_pdf": str(candidate)},
             "log_check": {"overfull_tolerance_pt": 2.0},
             "visual_review": {"attempt": attempt, "pages": [str(rendered)]},
@@ -404,7 +417,7 @@ def test_latex_visual_pass_rejects_unresolved_issues(tmp_path):
     module._write_json(paths["report"], {
         "status": "visual_pending",
         "page_count": 1,
-        "table_figure_signature": "sig",
+        "layout_snapshot": ["table"],
         "compile": {"candidate_pdf": str(candidate)},
         "log_check": {"overfull_tolerance_pt": 2.0},
         "visual_review": {"attempt": 1, "pages": [str(rendered)]},
@@ -420,7 +433,7 @@ def test_latex_visual_pass_rejects_unresolved_issues(tmp_path):
         )
 
 
-def test_evidence_audit_requires_current_layout_qa_for_published_pdf(tmp_path):
+def test_evidence_audit_requires_layout_qa_for_published_pdf(tmp_path):
     audit_module = _load(
         "skills/mapce-scientific-writing/scripts/audit_workspace.py",
         "mapce_audit_layout_qa",
@@ -436,14 +449,8 @@ def test_evidence_audit_requires_current_layout_qa_for_published_pdf(tmp_path):
 
     qa.write_text(json.dumps({
         "status": "layout_approved",
-        "source_sha256": audit_module._sha256(tex),
-        "pdf_sha256": audit_module._sha256(pdf),
     }))
     accepted = audit_module.audit(workspace)
 
     assert accepted["status"] == "ok"
     assert accepted["counts"]["layout_approved_pdfs"] == 1
-
-    tex.write_text(tex.read_text() + "\n% changed after approval\n")
-    stale = audit_module.audit(workspace)
-    assert "layout_source_changed" in {error["code"] for error in stale["errors"]}

@@ -50,7 +50,8 @@ python <skill-dir>/scripts/latex_quality_gate.py review \
 ```
 
 Only this command publishes the candidate as `manuscript/review.pdf` and writes
-`manuscript/review.layout-qa.json` with `status=layout_approved`.
+`manuscript/review.layout-qa.json` with `status=layout_approved`. The approval record is
+deliberately minimal; rerun the gate after any later LaTeX or PDF change.
 
 When visual defects exist, record them instead:
 
