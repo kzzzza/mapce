@@ -36,19 +36,25 @@ def initialize_workspace(
     title: str,
     question: str,
     review_mode: str,
+    indexing_permission: str = "per_paper",
+    user_authorized_autonomous_indexing: bool = False,
 ) -> Path:
     output_dir = output_dir.expanduser().resolve()
     if output_dir.exists() and any(output_dir.iterdir()):
         raise FileExistsError(f"Research workspace is not empty: {output_dir}")
     if review_mode not in {"rapid", "prisma"}:
         raise ValueError("review_mode must be 'rapid' or 'prisma'")
+    if indexing_permission not in {"per_paper", "autonomous"}:
+        raise ValueError("indexing_permission must be 'per_paper' or 'autonomous'")
+    if indexing_permission == "autonomous" and not user_authorized_autonomous_indexing:
+        raise ValueError("autonomous indexing requires explicit user authorization")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     for directory in DIRECTORIES:
         (output_dir / directory).mkdir()
     now = datetime.now(timezone.utc).isoformat()
     project = {
-        "schema_version": 1,
+        "schema_version": 2,
         "title": title,
         "research_question": question,
         "review_mode": review_mode,
@@ -56,6 +62,14 @@ def initialize_workspace(
         "created_at": now,
         "updated_at": now,
         "search_cutoff": None,
+        "indexing_authorization": {
+            "mode": indexing_permission,
+            "scope": "current_project",
+            "explicit_user_authorization": bool(
+                indexing_permission == "autonomous"
+                and user_authorized_autonomous_indexing
+            ),
+        },
         "unresolved_decisions": [],
     }
     (output_dir / "project.json").write_text(
@@ -86,12 +100,24 @@ def main() -> None:
     parser.add_argument("--title", required=True)
     parser.add_argument("--question", required=True)
     parser.add_argument("--review-mode", choices=("rapid", "prisma"), default="rapid")
+    parser.add_argument(
+        "--indexing-permission",
+        choices=("per-paper", "autonomous"),
+        default="per-paper",
+    )
+    parser.add_argument(
+        "--user-authorized-autonomous-indexing",
+        action="store_true",
+        help="Confirm explicit user authorization for this project's autonomous indexing.",
+    )
     args = parser.parse_args()
     path = initialize_workspace(
         args.output_dir,
         title=args.title,
         question=args.question,
         review_mode=args.review_mode,
+        indexing_permission=args.indexing_permission.replace("-", "_"),
+        user_authorized_autonomous_indexing=args.user_authorized_autonomous_indexing,
     )
     print(json.dumps({"status": "ok", "workspace": str(path)}, ensure_ascii=False))
 

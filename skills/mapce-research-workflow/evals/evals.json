@@ -4,11 +4,13 @@
     {
       "id": 1,
       "prompt": "帮我调研视觉运动策略的发展，选择关键论文，设计实验并写成一篇论文草稿。",
-      "expected_output": "The agent asks for the workspace and review mode, then routes discovery, reading, design, and writing through MAPCE.",
+      "expected_output": "The agent asks for the workspace, review mode, external-search permission, and indexing authorization, then routes discovery, reading, design, and writing through MAPCE.",
       "files": [],
       "expectations": [
         "Requests or records an approved output directory before writing files",
         "Requests rapid versus PRISMA review mode",
+        "Asks whether indexing is autonomous for this project or per-paper",
+        "Does not call index_paper before indexing authorization is resolved",
         "Uses specialist skills rather than inventing a single opaque workflow"
       ]
     },
@@ -20,6 +22,17 @@
       "expectations": [
         "Routes the request to mapce-paper-reading",
         "Does not create a research workspace"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "无人值守完成这项机器人论文调研，默认所有未回答的问题都按推荐值处理。",
+      "expected_output": "The agent may default the workspace and review mode, but keeps indexing in per-paper mode and does not invent user authorization for MAPCE writes.",
+      "files": [],
+      "expectations": [
+        "Limits non-interactive defaults to output path and review mode",
+        "Records per_paper indexing when explicit permission is absent",
+        "Does not call index_paper"
       ]
     }
   ]

@@ -20,7 +20,9 @@ build/
 ```
 
 `project.json` records the question, output path, review mode, search cutoff,
-current stage, and unresolved decisions. Raw API responses belong in `cache/`.
+current stage, indexing authorization, and unresolved decisions. Indexing authorization
+is either project-scoped `autonomous` permission explicitly granted by the user or the
+safe `per_paper` default. Raw API responses belong in `cache/`.
 Files under `cache/` and `build/` are disposable; evidence registries are not.
 
 The evidence locator is `paper_id + chunk_id + section_path`. Add a page number

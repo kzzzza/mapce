@@ -17,3 +17,8 @@ title with Unicode case folding, punctuation removal, and whitespace collapse.
 Do not equate citation count with quality or relevance. Do not claim complete
 coverage when an API failed, a source was omitted, or the query language was narrow.
 Never bypass authentication or a paywall.
+
+Paper discovery and paper indexing are separate permissions. At intake, record either
+project-scoped `autonomous` indexing explicitly granted by the user or `per_paper`
+approval. Missing permission always means `per_paper`. Even in autonomous mode, verify
+the title and identifier before indexing and never ingest raw search results blindly.

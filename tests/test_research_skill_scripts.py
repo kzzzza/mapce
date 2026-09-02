@@ -38,13 +38,50 @@ def test_workspace_initializer_creates_contract_and_refuses_overwrite(tmp_path):
     )
 
     assert created == workspace.resolve()
-    assert json.loads((workspace / "project.json").read_text())["stage"] == "scoped"
+    project = json.loads((workspace / "project.json").read_text())
+    assert project["stage"] == "scoped"
+    assert project["indexing_authorization"] == {
+        "mode": "per_paper",
+        "scope": "current_project",
+        "explicit_user_authorization": False,
+    }
     assert (workspace / "evidence/evidence_ledger.csv").is_file()
     assert "DRAFT" in (workspace / "manuscript/review.md").read_text()
     with pytest.raises(FileExistsError):
         module.initialize_workspace(
             workspace, title="Other", question="Other", review_mode="rapid"
         )
+
+
+def test_workspace_initializer_requires_explicit_autonomous_indexing_permission(tmp_path):
+    module = _load(
+        "skills/mapce-research-workflow/scripts/init_workspace.py",
+        "mapce_workspace_indexing_permission",
+    )
+
+    with pytest.raises(ValueError, match="explicit user authorization"):
+        module.initialize_workspace(
+            tmp_path / "rejected",
+            title="Robot control",
+            question="Question",
+            review_mode="rapid",
+            indexing_permission="autonomous",
+        )
+
+    workspace = module.initialize_workspace(
+        tmp_path / "accepted",
+        title="Robot control",
+        question="Question",
+        review_mode="rapid",
+        indexing_permission="autonomous",
+        user_authorized_autonomous_indexing=True,
+    )
+    project = json.loads((workspace / "project.json").read_text())
+    assert project["indexing_authorization"] == {
+        "mode": "autonomous",
+        "scope": "current_project",
+        "explicit_user_authorization": True,
+    }
 
 
 def test_discovery_parsers_and_identity_deduplication():

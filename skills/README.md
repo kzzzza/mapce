@@ -16,4 +16,9 @@ The skills call MAPCE through MCP. They do not open LanceDB directly and do not
 start a second embedding service. Research notes and manuscripts live in the
 user-approved project directory, outside MAPCE's database directory.
 
+At research intake, the agent asks whether paper indexing is authorized for the
+current project or requires approval for each paper. Missing or unattended input
+defaults to per-paper approval; external-search permission alone never authorizes
+a write to MAPCE.
+
 See `ATTRIBUTIONS.md` for the skills that informed this original implementation.

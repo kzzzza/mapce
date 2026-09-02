@@ -36,7 +36,9 @@ mapce skills install --target codex --update
 
 ## 启动研究项目
 
-总入口会先确认研究问题、输出目录和综述模式。用户没有指定目录时，推荐实际运行目录下的 `research/<项目名>/`，获得确认后才写入。
+总入口会先确认研究问题、输出目录、综述模式和论文索引授权。用户没有指定目录时，推荐实际运行目录下的 `research/<项目名>/`，获得确认后才写入。
+
+论文索引授权有两种模式。`autonomous` 表示用户明确允许 Agent 在当前项目中自主索引经过筛选、身份核验且可公开访问的相关论文；`per_paper` 表示每篇论文调用 `index_paper` 前都要单独确认。没有回答、无人值守执行或仅允许外部检索时，默认使用 `per_paper`。授权不会跨项目继承，也不包含删除论文或索引代码仓库。
 
 综述模式包括：
 
@@ -64,7 +66,7 @@ manuscript/references.bib
 
 发现流程先调用 MAPCE `search_papers`，再按需查询 arXiv 和 OpenAlex，并使用 Crossref 核对 DOI 元数据。候选按 DOI、arXiv ID、规范化标题和年份去重。
 
-外部候选会先写入清单。用户选择后才调用 `index_paper`，任务逐篇执行。arXiv ID 使用 `source_type=arxiv`；开放论文 URL 使用 `source_type=url`。只有 DOI、摘要页或付费页面的候选不会伪装成可索引 PDF。
+外部候选会先写入清单。逐篇授权模式下，用户选择后才调用 `index_paper`；自主授权模式下，Agent 可以索引符合项目范围的候选，但仍须先核对标题与 arXiv ID 或 DOI，并检查本地是否已经存在。任务逐篇执行。arXiv ID 使用 `source_type=arxiv`；开放论文 URL 使用 `source_type=url`。只有 DOI、摘要页或付费页面的候选不会伪装成可索引 PDF。
 
 ## 证据和写作状态
 

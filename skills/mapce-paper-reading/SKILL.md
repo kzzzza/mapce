@@ -4,7 +4,7 @@ description: Read and explain one or more indexed papers through MAPCE with sect
 license: MIT
 compatibility: Requires the MAPCE MCP server.
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
 ---
 
 # MAPCE Paper Reading
@@ -14,8 +14,11 @@ Read papers from MAPCE without inventing content that is absent from the index.
 ## Resolve and inspect
 
 1. Call `resolve_paper` with the internal ID, arXiv ID, or arXiv URL.
-2. If it is not indexed, report that state and offer to use
-   `mapce-literature-discovery`; do not pretend to have read the full text.
+2. If it is not indexed, report that state and route any proposed indexing through
+   `mapce-literature-discovery`; do not call `index_paper` directly and do not pretend to
+   have read the full text. A recorded project-scoped `autonomous` authorization may let
+   discovery index the identity-verified paper. Otherwise, ask for approval for that
+   exact paper. Missing or unanswered authorization means no MAPCE write.
 3. Call `get_paper_overview` for the abstract, outline, figures, tables, code status,
    and repository associations.
 4. Call `get_paper_citation`. Use the returned citation key and metadata; never infer
