@@ -1,10 +1,10 @@
 ---
 name: mapce-scientific-writing
-description: Draft, revise, and audit scientific reviews or research papers with MAPCE evidence provenance. Use for abstracts, introductions, related work, methods, results, discussions, IEEE/ACM manuscripts, BibTeX, response-to-reviewer work, or requests such as “写论文”, “把调研整理成 LaTeX”, “检查引用和主张”, and “按 IEEE/ACM 投稿”. Require evidence locators for factual claims and keep unverified work marked as a draft.
+description: Draft, revise, and audit scientific reviews or research papers with MAPCE evidence provenance. Use for abstracts, introductions, related work, methods, results, discussions, IEEE/ACM manuscripts, BibTeX, response-to-reviewer work, or any LaTeX writing and revision such as “写论文”, “把调研整理成 LaTeX”, “检查引用和主张”, and “按 IEEE/ACM 投稿”. Require evidence locators, compile and layout gates for every LaTeX change, and visual approval before final PDF delivery.
 license: MIT
-compatibility: Requires MAPCE MCP and a MAPCE research workspace.
+compatibility: Requires MAPCE MCP and a MAPCE research workspace. LaTeX output requires latexmk, pdfinfo, pdftoppm, and an image-viewing tool.
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
 ---
 
 # MAPCE Scientific Writing
@@ -44,6 +44,21 @@ absence of significance to equivalence.
 
 Keep `DRAFT — NOT FOR SUBMISSION` while any cited evidence lacks human verification or
 while authorship, declarations, results, or venue checks remain unresolved.
+
+## LaTeX quality gate
+
+Read `references/latex-quality-gate.md` whenever LaTeX is generated or revised. Run the
+bundled build command after every change. Compilation, unresolved references, and
+overfull boxes larger than 2 pt are blocking failures.
+
+Visual inspection of every rendered page is required for final delivery and whenever a
+table, figure, or page count changes. After a visual failure, repair and recheck at most
+twice. Leave the result pending for human review when the image-viewing tool is missing
+or three visual inspections fail.
+
+Do not call a PDF layout-approved, complete, final, or ready for delivery until the
+corresponding `.layout-qa.json` says `status=layout_approved` and its source/PDF hashes
+match the current files. Layout approval does not remove the scientific DRAFT state.
 
 ## Audit
 

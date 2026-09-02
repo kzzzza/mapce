@@ -4,7 +4,7 @@ description: Produce an evidence-traceable rapid, scoping, or PRISMA-style liter
 license: MIT
 compatibility: Requires MAPCE MCP and the complete MAPCE research skill bundle.
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
 ---
 
 # MAPCE Literature Review
@@ -61,6 +61,11 @@ conflicting evidence, corpus limits, and search cutoff.
 Start from `assets/review.md` and `assets/review.tex`. Produce both formats plus
 `references.bib`; use identical citation keys. In PRISMA mode also produce a protocol,
 screening table, exclusion summary, quality assessment, and flow counts.
+
+Route every LaTeX generation or revision through `mapce-scientific-writing` and its
+LaTeX quality gate. A successful evidence audit or LaTeX compilation alone does not
+approve the PDF layout. Final delivery, table or figure changes, and page-count changes
+require inspection of every rendered page and a matching `.layout-qa.json` record.
 
 Keep `DRAFT — NOT FOR SUBMISSION` until a human checks every included source and
 approves the synthesis. Do not claim PRISMA compliance merely because files exist.

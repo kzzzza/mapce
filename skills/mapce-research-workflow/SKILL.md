@@ -4,7 +4,7 @@ description: Coordinate an end-to-end research project using MAPCE, from researc
 license: MIT
 compatibility: Requires the MAPCE MCP server and the complete MAPCE research skill bundle.
 metadata:
-  version: "0.1.1"
+  version: "0.1.2"
 ---
 
 # MAPCE Research Workflow
@@ -64,6 +64,10 @@ initializer rejects an autonomous setting without that confirmation flag.
 - Use `mapce-literature-review` for thematic synthesis and review outputs.
 - Use `mapce-experimental-design` before experiments or benchmark execution.
 - Use `mapce-scientific-writing` for manuscript drafting and evidence audits.
+
+Any stage that creates or revises LaTeX must use the scientific-writing LaTeX quality
+gate. Do not treat a compiled PDF as a final deliverable without a current
+`status=layout_approved` record from a complete rendered-page inspection.
 
 Run indexing requests serially through MAPCE. Do not invoke a second MAPCE
 service or direct Python database connection.

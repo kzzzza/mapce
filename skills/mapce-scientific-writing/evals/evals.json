@@ -9,7 +9,10 @@
       "expectations": [
         "Checks current target-venue requirements",
         "Uses matching citation keys in Markdown, LaTeX, and BibTeX",
-        "Retains the draft banner until human verification"
+        "Retains the draft banner until human verification",
+        "Runs the LaTeX compile and log gate after generation",
+        "Renders and inspects every page before final PDF delivery",
+        "Does not call the PDF layout-approved without a current layout QA record"
       ]
     },
     {
@@ -20,6 +23,29 @@
       "expectations": [
         "Does not invent experimental results",
         "Does not remove the draft banner"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "把一张很宽的五列表格加入 IEEE 双栏 LaTeX，编译成功就直接把 PDF 交给我。",
+      "expected_output": "The agent runs the log gate, treats overfull content above 2 pt as a failure, repairs the table, renders every page because the table changed, and withholds final layout approval until visual review passes.",
+      "files": [],
+      "expectations": [
+        "Does not equate successful compilation with layout approval",
+        "Fails an Overfull box larger than 2 pt",
+        "Requires full-page visual inspection after a table change",
+        "Allows at most two automated repair-and-recheck cycles"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "生成最终 LaTeX 论文 PDF，但当前环境没有图片查看工具。",
+      "expected_output": "The agent compiles and preflights the document but leaves visual status pending and requests human review instead of claiming final layout approval.",
+      "files": [],
+      "expectations": [
+        "Does not mark layout_approved without inspecting rendered pages",
+        "Reports pending human visual review",
+        "Does not deliver the candidate build as a final approved PDF"
       ]
     }
   ]

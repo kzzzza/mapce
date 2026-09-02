@@ -81,6 +81,14 @@ manuscript/references.bib
 
 Crossref 核对 DOI 不能代替正文证据核验。存在未核验来源时，Markdown 和 LaTeX 保留 `DRAFT — NOT FOR SUBMISSION`。
 
+## LaTeX 编译与版面验收
+
+所有 MAPCE 科研 Skill 产生或修改 LaTeX 后，都要运行论文写作 Skill 提供的质量门。每次修改都会重新编译、检查未解析引用，并把超过 2 pt 的 `Overfull` 判为失败。
+
+最终交付、表格或图片变化、PDF 页数变化时，质量门会把全部页面串行渲染为 PNG。Agent 必须检查每一页的重叠、裁切、栏宽、浮动体、公式、标题、页眉页脚和参考文献。视觉检查失败后最多自动修复并复检两轮；第三次仍失败时停止自动修改并请求人工处理。
+
+候选 PDF 保留在 `build/latex-quality/`。只有视觉检查通过后才发布到 `manuscript/`，并生成同名 `.layout-qa.json`。证据审计会核对 LaTeX、PDF 和验收记录的哈希；缺少验收、文件之后发生变化或哈希不一致都会失败。版面通过与科学内容状态相互独立，未经人工核验的论文仍保留 `DRAFT — NOT FOR SUBMISSION`。
+
 ## 资源与内存边界
 
 Skill 只通过 MCP 使用现有单例服务，不直接导入 MAPCE 数据库模块。外部搜索脚本只处理元数据。论文索引串行执行，避免同时运行多个解析任务或重复加载嵌入模型。

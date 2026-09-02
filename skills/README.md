@@ -21,4 +21,8 @@ current project or requires approval for each paper. Missing or unattended input
 defaults to per-paper approval; external-search permission alone never authorizes
 a write to MAPCE.
 
+Every LaTeX change uses the bundled compile and log gate. Final delivery, table or
+figure changes, and page-count changes also require inspection of every rendered page.
+Only a visually reviewed PDF receives a hash-bound `layout_approved` record.
+
 See `ATTRIBUTIONS.md` for the skills that informed this original implementation.

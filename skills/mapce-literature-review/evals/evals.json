@@ -9,7 +9,8 @@
       "expectations": [
         "Asks for review mode before starting",
         "Records the search cutoff and coverage limits",
-        "Organizes synthesis by themes and development stages"
+        "Organizes synthesis by themes and development stages",
+        "Routes LaTeX output through compile, log, and conditional visual layout gates"
       ]
     },
     {

@@ -11,7 +11,8 @@
         "Requests rapid versus PRISMA review mode",
         "Asks whether indexing is autonomous for this project or per-paper",
         "Does not call index_paper before indexing authorization is resolved",
-        "Uses specialist skills rather than inventing a single opaque workflow"
+        "Uses specialist skills rather than inventing a single opaque workflow",
+        "Routes every LaTeX output through the scientific-writing layout gate"
       ]
     },
     {

@@ -213,3 +213,237 @@ def test_evidence_audit_reports_missing_locator_and_undefined_references(tmp_pat
     assert "unknown_manuscript_evidence" in codes
     assert "undefined_bibtex_key" in codes
     assert "citation_format_mismatch" in codes
+
+
+def test_latex_log_gate_rejects_large_overfull_and_unresolved_references():
+    module = _load(
+        "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
+        "mapce_latex_log_gate",
+    )
+    result = module.parse_latex_log(
+        "Overfull \\hbox (1.5pt too wide)\n"
+        "Overfull \\hbox (309.64569pt too wide)\n"
+        "LaTeX Warning: There were undefined references.\n",
+        overfull_tolerance_pt=2.0,
+    )
+
+    assert result["status"] == "failed"
+    assert [item["amount_pt"] for item in result["overfull_failures"]] == [309.64569]
+    assert result["unresolved_references"]
+
+
+def test_latex_visual_reasons_track_layout_and_page_changes():
+    module = _load(
+        "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
+        "mapce_latex_visual_reasons",
+    )
+    first_signature, has_layout = module.layout_signature(
+        "Text\\begin{table}A\\end{table}"
+    )
+    changed_signature, _ = module.layout_signature(
+        "Different prose\\begin{table}B\\end{table}"
+    )
+
+    assert has_layout is True
+    assert first_signature != changed_signature
+    assert module.visual_reasons(
+        final=False,
+        force_visual=False,
+        page_count=4,
+        table_figure_signature=first_signature,
+        has_layout_content=True,
+        last_approved=None,
+    ) == ["new_tables_or_figures"]
+    reasons = module.visual_reasons(
+        final=True,
+        force_visual=False,
+        page_count=5,
+        table_figure_signature=changed_signature,
+        has_layout_content=True,
+        last_approved={"page_count": 4, "table_figure_signature": first_signature},
+    )
+    assert reasons == ["final_delivery", "tables_or_figures_changed", "page_count_changed"]
+    removed = module.visual_reasons(
+        final=False,
+        force_visual=False,
+        page_count=4,
+        table_figure_signature=module.layout_signature("plain text")[0],
+        has_layout_content=False,
+        last_approved={"page_count": 4, "table_figure_signature": first_signature},
+    )
+    assert removed == ["tables_or_figures_changed"]
+
+
+def test_latex_layout_signature_detects_referenced_image_changes(tmp_path):
+    module = _load(
+        "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
+        "mapce_latex_image_signature",
+    )
+    figures = tmp_path / "figures"
+    figures.mkdir()
+    image = figures / "figure.png"
+    image.write_bytes(b"first-image")
+    source = "\\graphicspath{{figures/}}\\includegraphics{figure}"
+    first, has_layout = module.layout_signature(source, base_dir=tmp_path)
+    image.write_bytes(b"changed-image")
+    changed, _ = module.layout_signature(source, base_dir=tmp_path)
+
+    assert has_layout is True
+    assert first != changed
+
+
+def test_latex_visual_pass_publishes_pdf_and_hash_bound_qa(tmp_path):
+    module = _load(
+        "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
+        "mapce_latex_visual_pass",
+    )
+    workspace = tmp_path / "research"
+    tex = workspace / "manuscript/review.tex"
+    tex.parent.mkdir(parents=True)
+    tex.write_text("\\documentclass{article}\\begin{document}ok\\end{document}")
+    paths = module._document_paths(workspace, tex)
+    candidate = paths["compile_dir"] / "review.pdf"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(b"candidate-pdf")
+    rendered = paths["pages_dir"] / "page-0001.png"
+    rendered.parent.mkdir(parents=True)
+    rendered.write_bytes(b"rendered-page")
+    module._write_json(paths["report"], {
+        "status": "visual_pending",
+        "source_sha256": module.sha256_file(tex),
+        "page_count": 1,
+        "table_figure_signature": "signature",
+        "compile": {"candidate_pdf": str(candidate)},
+        "log_check": {"overfull_tolerance_pt": 2.0},
+        "visual_review": {"status": "pending", "attempt": 1, "pages": [str(rendered)]},
+    })
+
+    result = module.record_visual_review(
+        workspace,
+        tex,
+        result="pass",
+        reviewed_pages="all",
+        notes="inspected",
+    )
+    qa = json.loads(paths["qa_record"].read_text())
+
+    assert result["status"] == "layout_approved"
+    assert paths["output_pdf"].read_bytes() == b"candidate-pdf"
+    assert qa["status"] == "layout_approved"
+    assert qa["source_sha256"] == module.sha256_file(tex)
+    assert qa["pdf_sha256"] == module.sha256_file(paths["output_pdf"])
+
+
+def test_latex_visual_failure_requires_issue_and_caps_automatic_rechecks(tmp_path):
+    module = _load(
+        "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
+        "mapce_latex_visual_failure",
+    )
+    workspace = tmp_path / "research"
+    tex = workspace / "manuscript/review.tex"
+    tex.parent.mkdir(parents=True)
+    tex.write_text("\\documentclass{article}")
+    paths = module._document_paths(workspace, tex)
+    candidate = paths["compile_dir"] / "review.pdf"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(b"candidate")
+    rendered = paths["pages_dir"] / "page-0001.png"
+    rendered.parent.mkdir(parents=True)
+    rendered.write_bytes(b"rendered-page")
+
+    module._write_json(paths["report"], {
+        "status": "visual_pending",
+        "page_count": 1,
+        "table_figure_signature": "sig",
+        "compile": {"candidate_pdf": str(candidate)},
+        "log_check": {"overfull_tolerance_pt": 2.0},
+        "visual_review": {"attempt": 1, "pages": [str(rendered)]},
+    })
+    with pytest.raises(ValueError, match="at least one issue"):
+        module.record_visual_review(
+            workspace, tex, result="fail", reviewed_pages="all"
+        )
+
+    for attempt in range(1, 4):
+        module._write_json(paths["report"], {
+            "status": "visual_pending",
+            "page_count": 1,
+            "table_figure_signature": "sig",
+            "compile": {"candidate_pdf": str(candidate)},
+            "log_check": {"overfull_tolerance_pt": 2.0},
+            "visual_review": {"attempt": attempt, "pages": [str(rendered)]},
+        })
+        result = module.record_visual_review(
+            workspace,
+            tex,
+            result="fail",
+            reviewed_pages="all",
+            issues=["overlap"],
+        )
+    state = json.loads(paths["state"].read_text())
+    assert result["visual_review"]["automatic_repair_rounds_remaining"] == 0
+    assert state["visual_failures"] == 3
+
+
+def test_latex_visual_pass_rejects_unresolved_issues(tmp_path):
+    module = _load(
+        "skills/mapce-scientific-writing/scripts/latex_quality_gate.py",
+        "mapce_latex_visual_unresolved",
+    )
+    workspace = tmp_path / "research"
+    tex = workspace / "manuscript/review.tex"
+    tex.parent.mkdir(parents=True)
+    tex.write_text("\\documentclass{article}")
+    paths = module._document_paths(workspace, tex)
+    candidate = paths["compile_dir"] / "review.pdf"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(b"candidate")
+    rendered = paths["pages_dir"] / "page-0001.png"
+    rendered.parent.mkdir(parents=True)
+    rendered.write_bytes(b"rendered")
+    module._write_json(paths["report"], {
+        "status": "visual_pending",
+        "page_count": 1,
+        "table_figure_signature": "sig",
+        "compile": {"candidate_pdf": str(candidate)},
+        "log_check": {"overfull_tolerance_pt": 2.0},
+        "visual_review": {"attempt": 1, "pages": [str(rendered)]},
+    })
+
+    with pytest.raises(ValueError, match="cannot retain unresolved"):
+        module.record_visual_review(
+            workspace,
+            tex,
+            result="pass",
+            reviewed_pages="all",
+            issues=["table overlap"],
+        )
+
+
+def test_evidence_audit_requires_current_layout_qa_for_published_pdf(tmp_path):
+    audit_module = _load(
+        "skills/mapce-scientific-writing/scripts/audit_workspace.py",
+        "mapce_audit_layout_qa",
+    )
+    workspace = _make_workspace(tmp_path)
+    tex = workspace / "manuscript/review.tex"
+    pdf = workspace / "manuscript/review.pdf"
+    qa = workspace / "manuscript/review.layout-qa.json"
+    pdf.write_bytes(b"pdf")
+
+    missing = audit_module.audit(workspace)
+    assert "layout_qa_required" in {error["code"] for error in missing["errors"]}
+
+    qa.write_text(json.dumps({
+        "status": "layout_approved",
+        "source_sha256": audit_module._sha256(tex),
+        "pdf_sha256": audit_module._sha256(pdf),
+    }))
+    accepted = audit_module.audit(workspace)
+
+    assert accepted["status"] == "ok"
+    assert accepted["counts"]["layout_approved_pdfs"] == 1
+
+    tex.write_text(tex.read_text() + "\n% changed after approval\n")
+    stale = audit_module.audit(workspace)
+    assert "layout_source_changed" in {error["code"] for error in stale["errors"]}
