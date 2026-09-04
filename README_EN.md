@@ -109,7 +109,38 @@ Restart Claude Code, approve the MAPCE server, and interact in natural language:
 >
 > Find papers and code about attention mechanisms in transformer architectures
 
-### Background Service Management
+## Codex Integration
+
+After global installation and `mapce config set-env`, connect through `mapce-mcp`, not `mapce` (which opens the TUI). Codex, Claude Code, and the TUI reuse the same background service when configured with the same `MAPCE_DATA_DIR`; no manual HTTP port or token configuration is needed.
+
+With Codex CLI installed:
+
+```bash
+command -v mapce-mcp  # Check that global installation returns an absolute path
+codex mcp add mapce -- "$(command -v mapce-mcp)"
+codex mcp get mapce
+```
+
+Alternatively, add this to `~/.codex/config.toml`, replacing the executable path. Edit an existing `[mcp_servers.mapce]` entry instead of adding a duplicate.
+
+```toml
+[mcp_servers.mapce]
+command = "/path/to/mapce-mcp"
+args = []
+startup_timeout_sec = 60
+tool_timeout_sec = 600
+```
+
+The proxy loads the saved `.env` automatically. To override it for this connection, add `env = { MAPCE_ENV_FILE = "/absolute/path/to/.env" }` to the same entry; keep MinerU credentials in that file. The example allows extra time for startup, initial model loading, and paper indexing.
+
+Local Codex clients on the same host share MCP configuration; see the official [Model Context Protocol documentation](https://developers.openai.com/codex/mcp/). Restart the client, check `/mcp` in Codex CLI, and try a read-only request:
+
+> Use MAPCE to list indexed papers and search for robot control papers. Do not add or delete indexes.
+
+`codex mcp get mapce` verifies configuration, not connectivity. Confirm that a tool call succeeds. For a missing executable, check the absolute path; for connection failures, inspect `mapce config show` and `mapce serve-status`.
+
+
+## Background Service Management
 
 ```bash
 mapce serve

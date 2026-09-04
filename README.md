@@ -109,7 +109,37 @@ MAPCE 通过一个本地后台服务集中持有 LanceDB 连接和嵌入模型�
 >
 > 检索 transformer 架构中关于 attention 机制的相关论文和代码
 
-### 后台服务管理
+## 接入 Codex
+
+完成上面的全局安装与 `mapce config set-env` 配置后，使用 `mapce-mcp` 接入。不要将启动命令设为 `mapce`，后者会打开 TUI。Codex 与 Claude Code、TUI 使用同一个 `MAPCE_DATA_DIR` 时，会复用同一个后台服务，无需手动配置 HTTP 端口或认证令牌。
+
+已安装 Codex CLI 时，在终端执行：
+
+```bash
+command -v mapce-mcp  # 确认全局安装成功，且返回绝对路径
+codex mcp add mapce -- "$(command -v mapce-mcp)"
+codex mcp get mapce
+```
+
+也可以手动编辑 `~/.codex/config.toml`，加入以下配置，将 `/path/to/mapce-mcp` 替换为上面的实际路径。如果已经存在 `[mcp_servers.mapce]`，修改原条目，不要重复添加。
+
+```toml
+[mcp_servers.mapce]
+command = "/path/to/mapce-mcp"
+args = []
+startup_timeout_sec = 60
+tool_timeout_sec = 600
+```
+
+`mapce-mcp` 会自动读取保存的 `.env`。如果需要为该连接单独指定环境文件，可在同一条目下添加 `env = { MAPCE_ENV_FILE = "/absolute/path/to/.env" }`，无需将 MinerU 密钥复制进 Codex 配置。首次加载模型或索引论文可能较慢，示例放宽了启动和工具调用超时。
+
+同一主机上的 Codex 本地客户端共享 MCP 配置，配置格式见官方 [Model Context Protocol 文档](https://developers.openai.com/codex/mcp/)。保存后重启客户端，在 Codex CLI 中输入 `/mcp` 查看连接状态，再发送一个只读请求：
+
+> 使用 MAPCE 列出本地已索引论文，并检索机器人控制相关论文；不要添加或删除索引。
+
+`codex mcp get mapce` 只能确认配置，实际工具调用成功才表示连接可用。若提示找不到命令，检查绝对路径；若连接失败，运行 `mapce config show` 和 `mapce serve-status` 检查环境文件及后台状态。
+
+## 后台服务管理
 
 ```bash
 mapce serve          # 启动或复用后台服务
